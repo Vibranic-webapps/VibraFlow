@@ -1,11 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
+import { readSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { userId } = await auth();
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const session = await readSession();
+        if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { userId } = session;
 
         const { id } = await params;
         const category = await prisma.category.findFirst({ where: { id, userId } });

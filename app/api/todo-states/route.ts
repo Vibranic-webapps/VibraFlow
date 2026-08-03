@@ -1,11 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
+import { readSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET() {
     try {
-        const { userId } = await auth();
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const session = await readSession();
+        if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { userId } = session;
 
         const states = await prisma.todoState.findMany({
             where: { userId },
@@ -20,8 +21,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
     try {
-        const { userId } = await auth();
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const session = await readSession();
+        if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { userId } = session;
 
         const body = await request.json();
         const { name, color, order } = body;
