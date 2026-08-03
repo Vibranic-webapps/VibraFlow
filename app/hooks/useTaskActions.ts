@@ -26,6 +26,8 @@ export function useTaskActions(setTasks: React.Dispatch<React.SetStateAction<Tas
     };
 
     const updateTask = async (task: Task, updates: Partial<Task>): Promise<Task | null> => {
+        // 1. Optimistic apply — flip the UI immediately, before the network call.
+        setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, ...updates } : t)));
         try {
             const res = await fetch(`/api/tasks/${task.id}`, {
                 method: "PATCH",
@@ -33,14 +35,19 @@ export function useTaskActions(setTasks: React.Dispatch<React.SetStateAction<Tas
                 body: JSON.stringify(updates),
             });
             if (res.ok) {
+                // 2. Reconcile with the server's authoritative copy (invisible swap).
                 const updated: Task = await res.json();
                 setTasks(prev => prev.map(t => (t.id === task.id ? updated : t)));
                 return updated;
             }
+            // 3a. Server rejected — roll back to the pre-change snapshot.
+            setTasks(prev => prev.map(t => (t.id === task.id ? task : t)));
             toast.error("Failed to update task.");
             return null;
         } catch (error) {
+            // 3b. Network error — roll back too.
             console.error("Error updating task:", error);
+            setTasks(prev => prev.map(t => (t.id === task.id ? task : t)));
             toast.error("Error updating task");
             return null;
         }

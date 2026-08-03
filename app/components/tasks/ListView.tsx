@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Heart, Check, Trash, Pencil, Plus, Search, ArrowDownUp, Inbox, SearchX, TriangleAlert, X } from "lucide-react";
+import { Heart, Check, Trash, Pencil, Plus, Search, ArrowDownUp, Inbox, SearchX, TriangleAlert, X, ListFilter } from "lucide-react";
 import { DynamicIcon, type IconName } from "lucide-react/dynamic";
 import { Task, Category } from "@/app/types";
 import { priorityOptions } from "@/app/constants"
@@ -43,12 +43,29 @@ export default function ListView({ tasks, setTasks, loading, categories, setCate
     const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "favorite">("all");
     const [sortBy, setSortBy] = useState<"date" | "priority">("date");
     const [catFilter, setCatFilter] = useState<string | null>(null);
+    const [filtersOpen, setFiltersOpen] = useState(false);
+
+    // How many non-default filters are applied (search stays visible, so it's
+    // not counted here). Drives the badge on the Filters button.
+    const activeFilterCount = (statusFilter !== "all" ? 1 : 0) + (catFilter ? 1 : 0);
 
     const clearFilters = () => { setSearch(""); setStatusFilter("all"); setCatFilter(null); };
 
     const now = new Date();
     const visible = tasks.filter(t => t.startDateTime !== null);
     const stats = taskStats(visible, now);
+
+    // Remember how many rows were shown last time so the loading skeleton
+    // renders a matching count on the next visit (we can't know it during the
+    // very first fetch). Default to a small guess; cap so it never floods.
+    const [skeletonCount, setSkeletonCount] = useState(3);
+    useEffect(() => {
+        const saved = Number(localStorage.getItem("orbit:listCount"));
+        if (Number.isFinite(saved) && saved > 0) setSkeletonCount(Math.min(saved, 12));
+    }, []);
+    useEffect(() => {
+        if (!loading) localStorage.setItem("orbit:listCount", String(visible.length));
+    }, [loading, visible.length]);
 
     const filtered = visible.filter(t => {
         if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -251,59 +268,92 @@ export default function ListView({ tasks, setTasks, loading, categories, setCate
                     {stats.completed > 0 && <> · <span className="text-white/60">{stats.completed}</span> done</>}
                 </p>
 
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                    <div className="flex items-center gap-2 flex-1 min-w-48 border-b border-white/10 focus-within:border-(--vibranic) transition-colors">
-                        <Search size={16} className="text-white/40 shrink-0" />
-                        <input type="text" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)}
-                            className="w-full bg-transparent py-1.5 text-sm text-white/90 placeholder:text-white/30 focus:outline-none" />
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                        {([["all", "All"], ["active", "Active"], ["completed", "Done"], ["favorite", "Favorites"]] as const).map(([val, label]) => (
-                            <button key={val} type="button" onClick={() => setStatusFilter(val)}
-                                className={`transition-colors cursor-pointer ${statusFilter === val ? "text-(--vibranic) drop-shadow-[0_0_8px_var(--vibranic)]" : "text-white/40 hover:text-white"}`}>
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-                    <button type="button" onClick={() => setSortBy(s => s === "date" ? "priority" : "date")}
-                        className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors cursor-pointer">
-                        <ArrowDownUp size={14} /> {sortBy === "date" ? "Date" : "Priority"}
-                    </button>
-                </div>
-
-                {categories.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2">
-                        <button type="button" onClick={() => setCatFilter(null)}
-                            className={`rounded-full border px-3 py-1 text-xs transition-colors cursor-pointer ${catFilter === null ? "border-white/30 bg-white/10 text-white" : "border-white/10 text-white/50 hover:text-white"
-                                }`}>
-                            All
+                <div className="flex flex-col gap-3">
+                    {/* Always-visible row: search · sort · filters toggle */}
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 flex-1 min-w-0 border-b border-white/10 focus-within:border-(--vibranic) transition-colors">
+                            <Search size={16} className="text-white/40 shrink-0" />
+                            <input type="text" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)}
+                                className="w-full bg-transparent py-1.5 text-base sm:text-sm text-white/90 placeholder:text-white/30 focus:outline-none" />
+                        </div>
+                        <button type="button" onClick={() => setSortBy(s => s === "date" ? "priority" : "date")}
+                            className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors cursor-pointer shrink-0">
+                            <ArrowDownUp size={14} /> <span className="hidden sm:inline">{sortBy === "date" ? "Date" : "Priority"}</span>
                         </button>
-                        {categories.map(c => (
-                            <button key={c.id} type="button" onClick={() => setCatFilter(catFilter === c.id ? null : c.id)}
-                                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors cursor-pointer ${catFilter === c.id ? "border-white/30 bg-white/10 text-white" : "border-white/10 text-white/50 hover:text-white"
-                                    }`}>
-                                <span className="grid place-items-center h-4 w-4 rounded-full"
-                                    style={{
-                                        background: `radial-gradient(circle at 35% 35%, color-mix(in srgb, ${c.color} 85%, white) 0%, ${c.color} 45%, color-mix(in srgb, ${c.color}, black 45%) 100%)`,
-                                        boxShadow: `0 0 6px ${c.color}`,
-                                    }} />
-                                {c.name}
-                            </button>
-                        ))}
+                        <button type="button" onClick={() => setFiltersOpen(o => !o)}
+                            aria-expanded={filtersOpen}
+                            className={`relative flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors cursor-pointer shrink-0 ${filtersOpen || activeFilterCount > 0 ? "border-(--vibranic)/50 text-white" : "border-white/10 text-white/50 hover:text-white"}`}>
+                            <ListFilter size={15} />
+                            <span className="hidden sm:inline">Filters</span>
+                            {activeFilterCount > 0 && (
+                                <span className="grid place-items-center h-4 min-w-4 px-1 rounded-full bg-(--vibranic) text-[10px] font-semibold text-black">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                        </button>
                     </div>
-                )}
 
-                {loading ? (
-                    <div className="grid gap-8 grid-cols-1 @2xl:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4" aria-hidden>
-                        {Array.from({ length: 4 }).map((_, c) => (
-                            <div key={c} className="flex flex-col gap-3">
-                                <div className="h-3 w-24 rounded-full bg-white/10 animate-pulse" />
-                                <div className="flex flex-col gap-2 pl-11">
-                                    {Array.from({ length: 3 }).map((_, r) => (
-                                        <div key={r} className="h-12 rounded-lg bg-white/5 animate-pulse"
-                                            style={{ animationDelay: `${(c * 3 + r) * 90}ms` }} />
+                    {/* Collapsible panel: status + categories, hidden by default */}
+                    {filtersOpen && (
+                        <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                            <div className="flex items-center gap-4 text-sm">
+                                {([["all", "All"], ["active", "Active"], ["completed", "Done"], ["favorite", "Favorites"]] as const).map(([val, label]) => (
+                                    <button key={val} type="button" onClick={() => setStatusFilter(val)}
+                                        className={`transition-colors cursor-pointer ${statusFilter === val ? "text-(--vibranic) drop-shadow-[0_0_8px_var(--vibranic)]" : "text-white/40 hover:text-white"}`}>
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {categories.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button type="button" onClick={() => setCatFilter(null)}
+                                        className={`rounded-full border px-3 py-1 text-xs transition-colors cursor-pointer ${catFilter === null ? "border-white/30 bg-white/10 text-white" : "border-white/10 text-white/50 hover:text-white"
+                                            }`}>
+                                        All
+                                    </button>
+                                    {categories.map(c => (
+                                        <button key={c.id} type="button" onClick={() => setCatFilter(catFilter === c.id ? null : c.id)}
+                                            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors cursor-pointer ${catFilter === c.id ? "border-white/30 bg-white/10 text-white" : "border-white/10 text-white/50 hover:text-white"
+                                                }`}>
+                                            <span className="grid place-items-center h-4 w-4 rounded-full"
+                                                style={{
+                                                    background: `radial-gradient(circle at 35% 35%, color-mix(in srgb, ${c.color} 85%, white) 0%, ${c.color} 45%, color-mix(in srgb, ${c.color}, black 45%) 100%)`,
+                                                    boxShadow: `0 0 6px ${c.color}`,
+                                                }} />
+                                            {c.name}
+                                        </button>
                                     ))}
                                 </div>
+                            )}
+
+                            {activeFilterCount > 0 && (
+                                <button type="button" onClick={clearFilters}
+                                    className="self-start text-xs text-(--vibranic) hover:underline cursor-pointer">
+                                    Clear all filters
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {loading ? (
+                    <div className="flex flex-col gap-1 w-full max-w-md" aria-hidden aria-busy="true">
+                        {Array.from({ length: skeletonCount }).map((_, i) => (
+                            <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-2">
+                                {/* checkbox */}
+                                <div className="shrink-0 h-5 w-5 rounded-full bg-white/10 animate-pulse"
+                                    style={{ animationDelay: `${i * 90}ms` }} />
+                                {/* title + meta */}
+                                <div className="min-w-0 flex-1 flex flex-col gap-2">
+                                    <div className="h-3.5 rounded bg-white/10 animate-pulse"
+                                        style={{ width: ["58%", "72%", "46%", "64%", "52%"][i % 5], animationDelay: `${i * 90}ms` }} />
+                                    <div className="h-2.5 w-24 rounded bg-white/5 animate-pulse"
+                                        style={{ animationDelay: `${i * 90 + 45}ms` }} />
+                                </div>
+                                {/* favorite */}
+                                <div className="shrink-0 h-4 w-4 rounded bg-white/10 animate-pulse"
+                                    style={{ animationDelay: `${i * 90}ms` }} />
                             </div>
                         ))}
                     </div>

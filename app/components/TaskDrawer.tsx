@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Trash, ChevronLeft } from "lucide-react";
+import { AnimatePresence, motion, useDragControls, type PanInfo } from "motion/react";
 import { Task, Category, TaskFormValues, FormErrors } from "@/app/types";
 import TaskForm, { type SubView } from "./TaskForm";
 import { useTaskActions } from "@/app/hooks/useTaskActions";
@@ -75,28 +76,24 @@ const TaskDrawer = forwardRef<TaskDrawerHandle, TaskDrawerProps>(function TaskDr
     const [editErrors, setEditErrors] = useState<FormErrors>({});
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formOpen, setFormOpen] = useState(false);
-    const [drawerIn, setDrawerIn] = useState(false);
     const [subView, setSubView] = useState<SubView | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
     const [mounted, setMounted] = useState(false);
+    const dragControls = useDragControls();
 
     useEffect(() => {
         const id = requestAnimationFrame(() => setMounted(true));
         return () => cancelAnimationFrame(id);
     }, []);
 
-    useEffect(() => {
-        if (!formOpen) return;
-        const id = requestAnimationFrame(() => setDrawerIn(true));
-        return () => { cancelAnimationFrame(id); setDrawerIn(false); };
-    }, [formOpen]);
-
-    useEffect(() => { onOpenChange?.(drawerIn); }, [drawerIn, onOpenChange]);
+    useEffect(() => { onOpenChange?.(formOpen); }, [formOpen, onOpenChange]);
     useEffect(() => { onEditingChange?.(editingId); }, [editingId, onEditingChange]);
 
     const closeForm = useCallback(() => {
-        setDrawerIn(false);
-        setTimeout(() => { setFormOpen(false); setEditingId(null); }, 300);
+        setFormOpen(false);
+        // Clear editing state after the exit animation so the form doesn't
+        // visibly swap to "Add task" while it's sliding out.
+        setTimeout(() => setEditingId(null), 300);
     }, []);
 
     useEffect(() => {
@@ -168,11 +165,33 @@ const TaskDrawer = forwardRef<TaskDrawerHandle, TaskDrawerProps>(function TaskDr
 
     return createPortal(
         <>
-            {formOpen && (
-                <>
-                    <div onClick={closeForm}
-                        className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-none transition-opacity duration-300 ${drawerIn ? "opacity-100" : "opacity-0"}`} />
-                    <div className={`fixed right-0 top-0 z-50 h-full w-full max-w-122.5 overflow-y-auto bg-white/5 border-l border-white/10 backdrop-blur-md lg:backdrop-blur-none p-6 transition-transform duration-300 ease-out ${drawerIn ? "translate-x-0" : "translate-x-full"}`}>
+            <AnimatePresence>
+                {formOpen && [
+                    <motion.div key="task-drawer-overlay"
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        onClick={closeForm}
+                        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-none" />,
+                    <motion.div key="task-drawer-panel"
+                        drag="x"
+                        dragControls={dragControls}
+                        dragListener={false}
+                        dragConstraints={{ left: 0 }}
+                        dragElastic={0.15}
+                        onDragEnd={(_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+                            if (info.offset.x > 120 || info.velocity.x > 500) closeForm();
+                        }}
+                        initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
+                        transition={{ type: "spring", damping: 32, stiffness: 320 }}
+                        className="fixed right-0 top-0 z-50 h-full w-full max-w-122.5 overflow-y-auto bg-white/5 border-l border-white/10 backdrop-blur-md lg:backdrop-blur-none p-6">
+                        {/* Drag handle — grab this to swipe the drawer closed (same feel as the bottom sheet). */}
+                        <div
+                            onPointerDown={(e) => dragControls.start(e)}
+                            className="mx-auto mb-4 flex h-6 w-full max-w-24 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+                        >
+                            <span className="h-1.5 w-10 rounded-full bg-white/25" />
+                        </div>
+
                         <div className="flex justify-between items-center">
                             {subView ? (
                                 <button type="button" onClick={subView.onBack}
@@ -200,9 +219,9 @@ const TaskDrawer = forwardRef<TaskDrawerHandle, TaskDrawerProps>(function TaskDr
                         ) : (
                             <TaskForm value={form} onChange={setForm} errors={formErrors} categories={categories} setCategories={setCategories} setTasks={setTasks} onSubmit={handleAddTask} submitLabel="Add task" onSubViewChange={setSubView} />
                         )}
-                    </div>
-                </>
-            )}
+                    </motion.div>,
+                ]}
+            </AnimatePresence>
 
             {confirmDelete && (
                 <div onClick={() => setConfirmDelete(null)}

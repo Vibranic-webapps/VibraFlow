@@ -1,14 +1,19 @@
 "use client";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Task } from "@/app/types";
 import { occursOn, isMultiDay, minutesIntoDay, startTimeLabel } from "@/app/lib/tasks";
 import { isSameDay, toDateTimeValue } from "@/app/lib/calendar";
 
 const HOUR_PX = 48;
-const DAY_PX = HOUR_PX * 24;
 const MIN_EVENT_PX = 20;
 const SNAP = 15;
-const HOURS = Array.from({ length: 24 }, (_, h) => h);
+
+// Dynamic hour window: render only the hours around the day's tasks so the grid
+// fits the screen instead of forcing a full 24h scroll.
+const DEFAULT_START_HOUR = 6;
+const DEFAULT_END_HOUR = 22;
+const WINDOW_PAD_HOURS = 1;
+const MIN_WINDOW_HOURS = 6;
 
 interface TimeGridViewProps {
     days: Date[];
@@ -43,6 +48,34 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
     const now = new Date();
     const cols = `repeat(${days.length}, minmax(6rem,1fr))`;
     const rowMinWidth = 56 + days.length * 96;
+
+    // Derive the visible hour window from the tasks currently on screen.
+    const [startHour, endHour] = useMemo(() => {
+        let min = Infinity, max = -Infinity;
+        for (const day of days) {
+            for (const t of tasks) {
+                if (!t.startDateTime || isMultiDay(t) || !occursOn(t, day)) continue;
+                const s = new Date(t.startDateTime);
+                const e = t.endDateTime ? new Date(t.endDateTime) : s;
+                min = Math.min(min, minutesIntoDay(s));
+                max = Math.max(max, isSameDay(e, s) ? minutesIntoDay(e) : 24 * 60);
+            }
+        }
+        if (!isFinite(min)) return [DEFAULT_START_HOUR, DEFAULT_END_HOUR];
+        let startH = Math.max(0, Math.floor(min / 60) - WINDOW_PAD_HOURS);
+        let endH = Math.min(24, Math.ceil(max / 60) + WINDOW_PAD_HOURS);
+        if (endH - startH < MIN_WINDOW_HOURS) {
+            endH = Math.min(24, startH + MIN_WINDOW_HOURS);
+            startH = Math.max(0, endH - MIN_WINDOW_HOURS);
+        }
+        return [startH, endH];
+    }, [days, tasks]);
+
+    const visibleHours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
+    const winStartMin = startHour * 60;
+    const winEndMin = endHour * 60;
+    const gridHeight = (endHour - startHour) * HOUR_PX;
+    const yFromMin = (min: number) => ((min - winStartMin) / 60) * HOUR_PX;
 
     const dragRef = useRef<DragState | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
@@ -93,6 +126,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
         setDraft(null);
         window.removeEventListener("pointermove", moveDrag);
         window.removeEventListener("pointerup", endDrag);
+        window.removeEventListener("pointercancel", endDrag);
         if (!d) return;
         suppressClickRef.current = true;
         setTimeout(() => { suppressClickRef.current = false; }, 0);
@@ -113,6 +147,10 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
     const beginDrag = (e: React.PointerEvent, task: Task, edge: DragEdge, origStart: number, origEnd: number) => {
         e.stopPropagation();
         e.preventDefault();
+        // Capture the pointer so touch drags keep delivering move/up events even
+        // once the finger leaves the tiny handle — without this the browser can
+        // hijack the gesture as a scroll and the drag dies on mobile.
+        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { }
         const originDayIndex = days.findIndex(day => isSameDay(day, new Date(task.startDateTime!)));
         dragRef.current = {
             task, edge, startY: e.clientY, origStart, origEnd, originDayIndex, moved: false,
@@ -122,11 +160,12 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
         // Track on window so the drag continues even as the event relocates between columns.
         window.addEventListener("pointermove", moveDrag);
         window.addEventListener("pointerup", endDrag);
+        window.addEventListener("pointercancel", endDrag);
     };
 
     return (
         <div className="rounded-lg border border-white/10 overflow-hidden">
-            <div className="scroll-space overflow-auto" style={{ maxHeight: "70vh" }}>
+            <div data-hscroll className="scroll-space overflow-auto" style={{ maxHeight: "70vh" }}>
                 <div className="sticky top-0 z-30 bg-[#0b0e1c]/95 backdrop-blur-sm" style={{ minWidth: rowMinWidth }}>
                     <div className="flex border-b border-white/10">
                         <div className="w-14 shrink-0 sticky left-0 z-40 bg-[#0b0e1c]" />
@@ -170,22 +209,22 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
 
                 <div className="flex" style={{ minWidth: rowMinWidth }}>
                     <div className="w-14 shrink-0 sticky left-0 z-20 bg-[#0b0e1c]">
-                        {HOURS.map(h => (
+                        {visibleHours.map(h => (
                             <div key={h} style={{ height: HOUR_PX }} className="relative">
                                 <span className="absolute -top-1.5 right-1 text-[10px] text-white/30">{hourLabel(h)}</span>
                             </div>
                         ))}
                     </div>
 
-                    <div ref={gridRef} className="relative grid flex-1" style={{ gridTemplateColumns: cols, height: DAY_PX }}>
-                        {HOURS.map(h => (
+                    <div ref={gridRef} className="relative grid flex-1" style={{ gridTemplateColumns: cols, height: gridHeight }}>
+                        {visibleHours.map(h => (
                             <div key={h} className="pointer-events-none absolute inset-x-0 border-t border-white/5"
-                                style={{ top: h * HOUR_PX }} />
+                                style={{ top: (h - startHour) * HOUR_PX }} />
                         ))}
 
-                        {days.some(d => isSameDay(d, now)) && (
+                        {days.some(d => isSameDay(d, now)) && minutesIntoDay(now) >= winStartMin && minutesIntoDay(now) <= winEndMin && (
                             <div className="pointer-events-none absolute inset-x-0 z-20 border-t border-red-500/70"
-                                style={{ top: (minutesIntoDay(now) / 60) * HOUR_PX }} />
+                                style={{ top: yFromMin(minutesIntoDay(now)) }} />
                         )}
 
                         {days.map((day, ci) => {
@@ -203,7 +242,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
                                     if (suppressClickRef.current) return;
                                     if (e.target !== e.currentTarget) return;
                                     const rect = e.currentTarget.getBoundingClientRect();
-                                    const rawMin = ((e.clientY - rect.top) / HOUR_PX) * 60;
+                                    const rawMin = ((e.clientY - rect.top) / HOUR_PX) * 60 + winStartMin;
                                     let startMin = clampMin(Math.round(rawMin / SNAP) * SNAP);
                                     if (startMin > 24 * 60 - 60) startMin = 24 * 60 - 60;
                                     onCreateAt(
@@ -221,8 +260,11 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
                                     const startMin = live ? live.startMin : baseStart;
                                     const endMin = live ? live.endMin : baseEnd;
 
-                                    const top = (startMin / 60) * HOUR_PX;
-                                    const height = Math.max(MIN_EVENT_PX, ((endMin - startMin) / 60) * HOUR_PX);
+                                    // Clamp the event to the visible hour window.
+                                    const vis0 = Math.max(startMin, winStartMin);
+                                    const vis1 = Math.min(endMin, winEndMin);
+                                    const top = yFromMin(vis0);
+                                    const height = Math.max(MIN_EVENT_PX, ((vis1 - vis0) / 60) * HOUR_PX);
                                     const color = t.category?.color ?? "#7C6CFF";
                                     const handle = "absolute inset-x-0 h-2 cursor-ns-resize touch-none z-10";
 

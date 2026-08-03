@@ -85,7 +85,7 @@ export default function TodoView({ tasks, setTasks, states, setStates, loading }
 
     if (loading) {
         return (
-            <div className="flex gap-4 p-4 overflow-x-auto">
+            <div data-hscroll className="flex gap-4 p-4 overflow-x-auto">
                 {[0, 1, 2].map(i => (
                     <div key={i} className="w-[82vw] max-w-72 shrink-0 snap-start sm:w-72 rounded-xl border border-white/10 bg-white/5 p-3">
                         <div className="h-5 w-24 rounded bg-white/10 animate-pulse" />
@@ -239,7 +239,7 @@ export default function TodoView({ tasks, setTasks, states, setStates, loading }
         <>
             {menuFor && <div className="fixed inset-0 z-10" onClick={() => setMenuFor(null)} />}
 
-            <div className="flex items-start gap-4 overflow-x-auto p-4 snap-x snap-mandatory scroll-p-4">
+            <div data-hscroll className="flex items-start gap-4 overflow-x-auto p-4 snap-x snap-mandatory scroll-p-4">
                 {orphan.length > 0 && (
                     <div
                         onDragOver={e => { e.preventDefault(); setDragOver("unassigned"); }}
