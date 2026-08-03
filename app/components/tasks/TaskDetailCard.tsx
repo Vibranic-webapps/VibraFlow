@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, type PanInfo } from "motion/react";
 import { X, Repeat, Heart, Check } from "lucide-react";
 import { Task } from "@/app/types";
 import { priorityOptions } from "@/app/constants";
@@ -91,6 +91,29 @@ function DetailSheet({ task, isDesktop, onClose }: { task: Task; isDesktop: bool
         ? { initial: { x: "100%" }, animate: { x: 0 }, exit: { x: "100%" } }
         : { initial: { y: "100%" }, animate: { y: 0 }, exit: { y: "100%" } };
 
+    // Drag-to-close. On mobile the sheet drags down; on desktop the side panel
+    // drags right. Past a distance/velocity threshold in the closing direction
+    // we close; otherwise motion springs it back to the open position.
+    const CLOSE_DISTANCE = 120;
+    const CLOSE_VELOCITY = 500;
+    const dragProps = isDesktop
+        ? {
+            drag: "x" as const,
+            dragConstraints: { left: 0 }, // can't drag past the open position
+            dragElastic: 0.15,
+            onDragEnd: (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+                if (info.offset.x > CLOSE_DISTANCE || info.velocity.x > CLOSE_VELOCITY) onClose();
+            },
+        }
+        : {
+            drag: "y" as const,
+            dragConstraints: { top: 0 }, // can't drag above the open position
+            dragElastic: 0.15,
+            onDragEnd: (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+                if (info.offset.y > CLOSE_DISTANCE || info.velocity.y > CLOSE_VELOCITY) onClose();
+            },
+        };
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -108,10 +131,11 @@ function DetailSheet({ task, isDesktop, onClose }: { task: Task; isDesktop: bool
                 animate={slide.animate}
                 exit={slide.exit}
                 transition={{ type: "spring", damping: 32, stiffness: 320 }}
+                {...dragProps}
                 className="w-full rounded-t-2xl border border-white/10 bg-[#0c0b1a]/95 backdrop-blur-xl p-5 pb-8 shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.7)]
                     lg:h-full lg:max-w-122.5 lg:rounded-none lg:border-0 lg:border-l lg:bg-white/5 lg:backdrop-blur-none lg:p-6 lg:pb-6 lg:shadow-none lg:overflow-y-auto"
             >
-                <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20 lg:hidden" />
+                <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-white/25 lg:hidden" />
 
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">

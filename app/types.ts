@@ -59,18 +59,3 @@ export type TaskFormValues = {
 };
 
 export type FormErrors = Partial<Record<keyof TaskFormValues, string>>;
-
-export type PlanetBody = {
-    id: string;
-    band: string;
-    color: string;
-    priority: Task["priority"];
-    size: number;
-    icon: string | null;
-    name: string;
-    description: string | null
-    due: string;
-    category: string | null;
-    urgency: number;
-    overdue: boolean;
-};

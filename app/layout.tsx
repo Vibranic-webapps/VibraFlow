@@ -1,4 +1,3 @@
-import {ClerkProvider} from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
@@ -21,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Vibranic Orbit",
-  description: "A task management app built with Next.js, Prisma, and Clerk for authentication.",
+  description: "A task management app built with Next.js and Prisma.",
 };
 
 export default function RootLayout({
@@ -36,10 +35,8 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ClerkProvider>
-          {children}
-          <Toaster richColors position="bottom-right" />
-        </ClerkProvider>
+        {children}
+        <Toaster richColors position="bottom-right" />
       </body>
     </html>
   );

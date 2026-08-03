@@ -1,11 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
+import { readSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { userId } = await auth();
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const session = await readSession();
+        if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { userId } = session;
 
         const { id } = await params;
         const state = await prisma.todoState.findFirst({ where: { id, userId } });
@@ -30,8 +31,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { userId } = await auth();
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const session = await readSession();
+        if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { userId } = session;
 
         const { id } = await params;
         const state = await prisma.todoState.findFirst({ where: { id, userId } });

@@ -330,12 +330,13 @@ export default function CalendarView({ tasks, setTasks, categories, setCategorie
                             : rangeLabel()}
                         <span className="ml-2 text-white/40 font-normal">{viewDate.getFullYear()}</span>
                     </h1>
-                    <div className="flex items-center justify-between w-full gap-4 sm:w-auto sm:justify-normal sm:gap-2">
+                    <div className="flex items-center justify-between w-full gap-3 flex-wrap gap-y-2 sm:w-auto sm:flex-nowrap sm:justify-normal sm:gap-2">
                         <div className="inline-flex rounded-md border border-white/10 p-0.5">
-                            {([["month", "Month"], ["week", "Week"], ["3day", "3 days"], ["day", "Day"]] as const).map(([val, label]) => (
+                            {([["month", "Month", "Month"], ["week", "Week", "Week"], ["3day", "3 days", "3d"], ["day", "Day", "Day"]] as const).map(([val, label, short]) => (
                                 <button key={val} onClick={() => setViewMode(val)}
-                                    className={`px-2.5 py-1 text-sm rounded cursor-pointer transition-colors ${viewMode === val ? "bg-white/10 text-white" : "text-white/50 hover:text-white"}`}>
-                                    {label}
+                                    className={`px-2 sm:px-2.5 py-1 text-xs sm:text-sm rounded cursor-pointer transition-colors whitespace-nowrap ${viewMode === val ? "bg-white/10 text-white" : "text-white/50 hover:text-white"}`}>
+                                    <span className="sm:hidden">{short}</span>
+                                    <span className="hidden sm:inline">{label}</span>
                                 </button>
                             ))}
                         </div>

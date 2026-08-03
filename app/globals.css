@@ -20,6 +20,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html, body {
+  height: 100%;
+  /* Kill the mobile rubber-band / overscroll bounce on the page itself. */
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--void);
   color: var(--text-primary);
