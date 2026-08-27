@@ -7,10 +7,9 @@ export const metadata: Metadata = {
     description: "The terms that govern your use of VibraFlow.",
 };
 
-// TODO: replace the bracketed placeholders before publishing.
-const OWNER = "[Your legal name]";
+const OWNER = "Kilian Frederix";
 const CONTACT = "kilianfrederix@gmail.com";
-const JURISDICTION = "[Your country]";
+const JURISDICTION = "Belgium";
 
 export default function TermsPage() {
     return (
