@@ -1,6 +1,7 @@
 import { readSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { reportEvent } from "@/lib/vibradex";
 
 export async function GET() {
     try {
@@ -49,6 +50,8 @@ export async function POST(request: NextRequest) {
             },
             include: { category: true, state: true }
         });
+
+        after(() => reportEvent("Task created", { details: { taskId: newTask.id, name: newTask.name, userId } }));
 
         return NextResponse.json(newTask, { status: 201 });
     } catch (error) {

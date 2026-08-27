@@ -7,10 +7,9 @@ export const metadata: Metadata = {
     description: "How VibraFlow collects, uses, and protects your data.",
 };
 
-// TODO: replace the bracketed placeholders before publishing.
-const OWNER = "[Your legal name]";
+const OWNER = "Kilian Frederix";
 const CONTACT = "kilianfrederix@gmail.com";
-const JURISDICTION = "[Your country]";
+const JURISDICTION = "Belgium";
 
 export default function PrivacyPage() {
     return (
