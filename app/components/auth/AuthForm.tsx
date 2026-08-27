@@ -111,6 +111,13 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                         {c.altLabel}
                     </Link>
                 </p>
+
+                <p className="text-center text-xs text-white/30">
+                    By continuing you agree to our{" "}
+                    <Link href="/terms" className="underline hover:text-white/60">Terms</Link>{" "}
+                    and{" "}
+                    <Link href="/privacy" className="underline hover:text-white/60">Privacy Policy</Link>.
+                </p>
             </form>
         </div>
     );

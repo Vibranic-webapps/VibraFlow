@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VibraFlow
 
-## Getting Started
+A personal planner for tasks, calendar, and goals — built to be genuinely nice to use every day. Part of the Vibranic suite.
 
-First, run the development server:
+> **Live demo:** _add your Vercel URL_ · **Companion app:** Vibradex (diagnostics dashboard)
+
+<!-- Add a screenshot here: ![VibraFlow](docs/screenshot.png) -->
+
+## Features
+
+- **Tasks** — list view grouped by day/week, optimistic complete/favorite, priority levels, categories, recurring tasks.
+- **Calendar** — month, week, 3-day, and day views with drag-to-move/resize events and a dynamic hour window that fits the screen.
+- **Todos board** — a customizable Kanban board with your own columns.
+- **Custom authentication** — email/password auth built from scratch (no third-party auth provider): bcrypt-hashed passwords, database-backed sessions, and an `httpOnly` cookie for persistent login.
+- **Mobile-first polish** — drag-to-close drawers, swipe between tabs, no-scroll layouts.
+
+## Tech stack
+
+| Layer | Choice |
+|-------|--------|
+| Framework | Next.js 16 (App Router) + TypeScript |
+| UI | Tailwind CSS v4, Framer Motion |
+| Database | PostgreSQL (Neon) via Prisma ORM |
+| Auth | Custom cookie-based sessions (bcrypt + `httpOnly` tokens) |
+| Hosting | Vercel |
+
+## Custom auth (the interesting part)
+
+Rather than reach for a managed provider, authentication is hand-rolled:
+
+- **Passwords** are hashed with bcrypt — never stored in plain text.
+- **Sessions** are random tokens stored server-side as SHA-256 hashes; the raw token lives in an `httpOnly`, `secure`, `sameSite=lax` cookie with a 30-day lifetime.
+- **Middleware** (`proxy.ts`) gates every route on the session cookie; API routes verify the session via `readSession()`.
+
+See `lib/auth/` for the implementation.
+
+## Getting started
 
 ```bash
+# 1. Install
+npm install
+
+# 2. Configure the database (see below), then apply migrations
+npx prisma migrate deploy
+
+# 3. Run
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000), create an account, and start planning.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a `.env` file:
 
-## Learn More
+```bash
+DATABASE_URL="postgresql://…"   # pooled connection (runtime queries)
+DIRECT_URL="postgresql://…"     # direct/unpooled connection (migrations)
+```
 
-To learn more about Next.js, take a look at the following resources:
+Both come from your Neon dashboard. Use a **dev branch** for local work so migrations never touch production.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/
+  (orbit)/        # main app shell + views (tasks / calendar / todos)
+  api/            # route handlers (auth, tasks, categories, todo-states)
+  login, signup   # custom auth pages
+  privacy, terms  # legal pages
+lib/auth/         # password hashing + session helpers
+prisma/           # schema + migrations
+```
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Personal project — all rights reserved.
