@@ -2,7 +2,8 @@
 
 A personal planner for tasks, calendar, and goals — built to be genuinely nice to use every day. Part of the Vibranic suite.
 
-> **Live demo:** _add your Vercel URL_ · **Companion app:** Vibradex (diagnostics dashboard)
+> **Live app:** vibraflow (planning webapp)  https://vibraflow.kilianfrederix.net · 
+> **Companion app:** Vibradex (diagnostics dashboard) https://vibradex.kilianfrederix.net · 
 
 <!-- Add a screenshot here: ![VibraFlow](docs/screenshot.png) -->
 
