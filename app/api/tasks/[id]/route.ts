@@ -1,6 +1,7 @@
 import { readSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { reportEvent } from "@/lib/vibradex";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }
 ) {
@@ -40,6 +41,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             },
             include: { category: true, state: true }
         });
+
+        after(() => reportEvent("Task updated", { details: { taskId: updatedTask.id, name: updatedTask.name, userId } }));
+
         return NextResponse.json(updatedTask);
     } catch (error) {
         console.error("Error updating task:", error);
@@ -59,6 +63,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         if (!task) return NextResponse.json({ error: "Task not found" }, { status: 404 });
 
         await prisma.task.delete({where: { id }})
+
+        after(() => reportEvent("Task deleted", { details: { taskId: id, name: task.name, userId } }));
 
         return NextResponse.json({Response: "Task deleted succesfully"}, {status: 200})
     } catch(error) {

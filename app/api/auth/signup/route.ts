@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
+import { reportEvent } from "@/lib/vibradex";
 
 export async function POST(request: NextRequest) {
     try {
@@ -32,6 +33,8 @@ export async function POST(request: NextRequest) {
 
         // Log them in right away.
         await createSession(user.id);
+
+        after(() => reportEvent("New user signed up", { details: { userId: user.id } }));
 
         return NextResponse.json({ id: user.id, email: user.email }, { status: 201 });
     } catch (error) {
