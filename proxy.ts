@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 // Pages that must stay reachable when logged out.
-const PUBLIC_PAGES = ["/login", "/signup"];
+const PUBLIC_PAGES = ["/login", "/signup", "/privacy", "/terms"];
+// Auth pages a logged-in user should be redirected away from (back to the app).
+const AUTH_PAGES = ["/login", "/signup"];
 
 export default function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
@@ -30,7 +32,11 @@ export default function proxy(request: NextRequest) {
     }
 
     // Already has a session but sitting on login/signup -> send home.
-    if (hasSession && isPublicPage) {
+    // (Legal pages stay reachable while logged in, so they're excluded here.)
+    const isAuthPage = AUTH_PAGES.some(
+        (p) => pathname === p || pathname.startsWith(p + "/"),
+    );
+    if (hasSession && isAuthPage) {
         const url = request.nextUrl.clone();
         url.pathname = "/";
         return NextResponse.redirect(url);
