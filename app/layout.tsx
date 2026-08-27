@@ -19,8 +19,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vibranic Orbit",
-  description: "A task management app built with Next.js and Prisma.",
+  title: "VibraFlow",
+  description: "VibraFlow — a personal planner for tasks, calendar, and goals.",
 };
 
 export default function RootLayout({

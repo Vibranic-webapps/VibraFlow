@@ -9,7 +9,7 @@ type Mode = "login" | "signup";
 const COPY = {
     login: {
         title: "Welcome back",
-        subtitle: "Sign in to your orbit",
+        subtitle: "Sign in to VibraFlow",
         submit: "Sign in",
         endpoint: "/api/auth/login",
         altText: "Need an account?",
@@ -18,7 +18,7 @@ const COPY = {
     },
     signup: {
         title: "Create your account",
-        subtitle: "Start organizing your orbit",
+        subtitle: "Start planning with VibraFlow",
         submit: "Sign up",
         endpoint: "/api/auth/signup",
         altText: "Already have an account?",
