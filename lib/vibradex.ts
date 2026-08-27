@@ -31,7 +31,6 @@ interface ReportOptions {
  * actions must stay `info` / `low`.
  */
 export async function reportEvent(message: string, opts: ReportOptions = {}): Promise<void> {
-    // If telemetry isn't configured (e.g. local dev without the keys), do nothing.
     if (!HUB_URL || !API_KEY) return;
 
     try {
@@ -47,11 +46,9 @@ export async function reportEvent(message: string, opts: ReportOptions = {}): Pr
                 message,
                 details: opts.details,
             }),
-            // Never let a slow/unreachable hub hang the request.
             signal: AbortSignal.timeout(3000),
         });
     } catch (error) {
-        // Telemetry is best-effort: log and move on, never throw.
         console.error("[vibradex] failed to report event:", error);
     }
 }
