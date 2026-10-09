@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth/password";
+import { hashPassword, passwordError } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { reportEvent } from "@/lib/vibradex";
 
@@ -16,8 +16,9 @@ export async function POST(request: NextRequest) {
         if (!normalizedEmail.includes("@")) {
             return NextResponse.json({ error: "Enter a valid email" }, { status: 400 });
         }
-        if (password.length < 8) {
-            return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+        const weak = passwordError(password);
+        if (weak) {
+            return NextResponse.json({ error: weak }, { status: 400 });
         }
 
         // Is the email already taken?

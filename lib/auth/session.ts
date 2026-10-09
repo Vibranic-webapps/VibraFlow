@@ -12,7 +12,7 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
  * Plain SHA-256 is enough here: the token is already 32 random bytes,
  * so it doesn't need the slow, salted hashing that human passwords do.
  */
-function hashToken(rawToken: string): string {
+export function hashToken(rawToken: string): string {
     return crypto.createHash("sha256").update(rawToken).digest("hex");
 }
 
