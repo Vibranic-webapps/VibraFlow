@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 // Pages that must stay reachable when logged out.
-const PUBLIC_PAGES = ["/login", "/signup", "/privacy", "/terms"];
+const PUBLIC_PAGES = ["/login", "/signup", "/forgot-password", "/reset-password", "/privacy", "/terms"];
 // Auth pages a logged-in user should be redirected away from (back to the app).
-const AUTH_PAGES = ["/login", "/signup"];
+// /reset-password is deliberately NOT here: a logged-in user who clicks an emailed link must still reach it.
+const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
 
 export default function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;

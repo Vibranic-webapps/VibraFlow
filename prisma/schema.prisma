@@ -30,12 +30,26 @@ model User {
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
   sessions       Session[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Session {
   id             String                 @id @default(cuid())
   hashedToken    String                 @unique
   userId         String                 
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  createdAt      DateTime               @default(now())
+
+  @@index([userId])
+}
+
+// One-time "forgot password" link. Same pattern as Session: the email carries
+// the raw token, the DB stores only its SHA-256 hash.
+model PasswordResetToken {
+  id             String                 @id @default(cuid())
+  hashedToken    String                 @unique
+  userId         String
   user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt      DateTime
   createdAt      DateTime               @default(now())

@@ -97,6 +97,16 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                     )}
                 </label>
 
+                {/* Login only. Negative margins pull the 44px tap target up under the field. */}
+                {mode === "login" && (
+                    <Link
+                        href="/forgot-password"
+                        className="-mt-4 -mb-2 inline-flex min-h-11 items-center self-end text-sm text-white/50 hover:text-(--vibranic) hover:underline"
+                    >
+                        Forgot password?
+                    </Link>
+                )}
+
                 <button
                     type="submit"
                     disabled={submitting}

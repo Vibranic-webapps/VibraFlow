@@ -1,8 +1,20 @@
 import bcrypt from "bcryptjs";
+import { MIN_PASSWORD_LENGTH } from "@/lib/auth/constants";
 
 // Cost factor: how many rounds bcrypt runs. Higher = slower to compute =
 // harder to brute-force. 10-12 is the standard sweet spot.
 const SALT_ROUNDS = 12;
+
+/**
+ * The one set of password rules, shared by signup and password reset.
+ * Returns a human-readable error, or null when the password is acceptable.
+ */
+export function passwordError(password: string): string | null {
+    if (password.length < MIN_PASSWORD_LENGTH) {
+        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+    }
+    return null;
+}
 
 /**
  * Hash a plaintext password before storing it.
