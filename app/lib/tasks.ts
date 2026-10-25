@@ -167,7 +167,7 @@ export function groupByCategory(tasks: Task[]): CategoryGroup[] {
             map.set(key, {
                 id: key,
                 name: c?.name ?? "Uncategorized",
-                color: c?.color ?? "#7C6CFF",
+                color: c?.color ?? "var(--accent)",
                 icon: c?.icon ?? "circle",
                 count: 1,
             });

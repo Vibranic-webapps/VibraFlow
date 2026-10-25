@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
-import { createPortal } from "react-dom";
-import { X, Trash, ChevronLeft } from "lucide-react";
-import { AnimatePresence, motion, useDragControls, type PanInfo } from "motion/react";
+import { useState, useEffect, useCallback, useImperativeHandle, forwardRef, useId } from "react";
 import { Task, Category, TaskFormValues, FormErrors } from "@/app/types";
 import TaskForm, { type SubView } from "./TaskForm";
+import { Sheet } from "@/app/components/ui/Sheet";
+import { Button } from "@/app/components/ui/Button";
+import { ChevronLeftIcon } from "@/app/components/ui/icons";
 import { useTaskActions } from "@/app/hooks/useTaskActions";
 import { toast } from "sonner";
 import { isoToLocalInput, isoToDateOnly } from "@/lib/datetime";
@@ -33,7 +33,6 @@ interface TaskDrawerProps {
     setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
     categories: Category[];
     setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
-    onOpenChange?: (open: boolean) => void;
     onEditingChange?: (id: string | null) => void;
 }
 
@@ -68,9 +67,10 @@ function validateTask(form: TaskFormValues): FormErrors {
 }
 
 const TaskDrawer = forwardRef<TaskDrawerHandle, TaskDrawerProps>(function TaskDrawer(
-    { tasks, setTasks, categories, setCategories, onOpenChange, onEditingChange }, ref,
+    { tasks, setTasks, categories, setCategories, onEditingChange }, ref,
 ) {
     const { createTask, updateTask, deleteTask } = useTaskActions(setTasks);
+    const formId = useId();
 
     const [form, setForm] = useState<TaskFormValues>(initialForm);
     const [editForm, setEditForm] = useState<TaskFormValues>(initialForm);
@@ -80,34 +80,15 @@ const TaskDrawer = forwardRef<TaskDrawerHandle, TaskDrawerProps>(function TaskDr
     const [formOpen, setFormOpen] = useState(false);
     const [subView, setSubView] = useState<SubView | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
-    const [mounted, setMounted] = useState(false);
-    const dragControls = useDragControls();
+    // Blocks a second tap on Save while the first request is still running.
+    const [busy, setBusy] = useState(false);
 
-    useEffect(() => {
-        const id = requestAnimationFrame(() => setMounted(true));
-        return () => cancelAnimationFrame(id);
-    }, []);
-
-    useEffect(() => { onOpenChange?.(formOpen); }, [formOpen, onOpenChange]);
     useEffect(() => { onEditingChange?.(editingId); }, [editingId, onEditingChange]);
 
     const closeForm = useCallback(() => {
         setFormOpen(false);
-        // Clear editing state after the exit animation so the form doesn't
-        // visibly swap to "Add task" while it's sliding out.
-        setTimeout(() => setEditingId(null), 300);
+        setEditingId(null);
     }, []);
-
-    useEffect(() => {
-        if (!formOpen) return;
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key !== "Escape") return;
-            if (subView) subView.onBack();
-            else closeForm();
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [formOpen, subView, closeForm]);
 
     useImperativeHandle(ref, () => ({
         openAdd: (prefill) => {
@@ -137,118 +118,100 @@ const TaskDrawer = forwardRef<TaskDrawerHandle, TaskDrawerProps>(function TaskDr
     }), []);
 
     const handleAddTask = async () => {
+        if (busy) return;
         const errs = validateTask(form);
         setFormErrors(errs);
         if (Object.keys(errs).length > 0) return;
-        const created = await createTask({
-            ...form,
-            endDateTime: form.frequency ? form.startDateTime : form.endDateTime,
-        });
-        if (created) { setForm(initialForm); setFormErrors({}); setFormOpen(false); }
+        setBusy(true);
+        try {
+            const created = await createTask({
+                ...form,
+                endDateTime: form.frequency ? form.startDateTime : form.endDateTime,
+            });
+            if (created) { setForm(initialForm); setFormErrors({}); setFormOpen(false); }
+        } finally {
+            setBusy(false);
+        }
     };
 
     const handleEditSubmit = async () => {
+        if (busy) return;
         const task = tasks.find(t => t.id === editingId);
         if (!task) return;
         const errs = validateTask(editForm);
         setEditErrors(errs);
         if (Object.keys(errs).length > 0) return;
-        await updateTask(task, {
-            ...editForm,
-            endDateTime: editForm.frequency ? editForm.startDateTime : editForm.endDateTime,
-            frequency: editForm.frequency ? (editForm.frequency as Task["frequency"]) : null,
-            recurrenceEnd: editForm.recurrenceEnd || null,
-        });
-        toast.success("Task updated successfully");
-        closeForm();
+        setBusy(true);
+        try {
+            await updateTask(task, {
+                ...editForm,
+                endDateTime: editForm.frequency ? editForm.startDateTime : editForm.endDateTime,
+                frequency: editForm.frequency ? (editForm.frequency as Task["frequency"]) : null,
+                recurrenceEnd: editForm.recurrenceEnd || null,
+            });
+            toast.success("Task updated successfully");
+            closeForm();
+        } finally {
+            setBusy(false);
+        }
     };
 
-    if (!mounted) return null;
+    // Escape, backdrop and the X step back out of a sub-screen first, then close the sheet.
+    const handleClose = () => {
+        if (subView) subView.onBack();
+        else closeForm();
+    };
 
-    return createPortal(
+    const title = subView?.title ?? (editingId ? "Edit task" : "Add task");
+
+    return (
         <>
-            <AnimatePresence>
-                {formOpen && [
-                    <motion.div key="task-drawer-overlay"
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        transition={{ duration: 0.25 }}
-                        onClick={closeForm}
-                        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-none" />,
-                    <motion.div key="task-drawer-panel"
-                        drag="x"
-                        dragControls={dragControls}
-                        dragListener={false}
-                        dragConstraints={{ left: 0 }}
-                        dragElastic={0.15}
-                        onDragEnd={(_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-                            if (info.offset.x > 120 || info.velocity.x > 500) closeForm();
-                        }}
-                        initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-                        transition={{ type: "spring", damping: 32, stiffness: 320 }}
-                        className="fixed right-0 top-0 z-50 h-full w-full max-w-122.5 overflow-y-auto bg-white/5 border-l border-white/10 backdrop-blur-md lg:backdrop-blur-none p-6">
-                        {/* Drag handle — grab this to swipe the drawer closed (same feel as the bottom sheet). */}
-                        <div
-                            onPointerDown={(e) => dragControls.start(e)}
-                            className="mx-auto mb-4 flex h-6 w-full max-w-24 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
-                        >
-                            <span className="h-1.5 w-10 rounded-full bg-white/25" />
-                        </div>
+            <Sheet
+                open={formOpen}
+                onClose={handleClose}
+                title={title}
+                footer={!subView && (
+                    <Button type="submit" form={formId} variant="primary" size="lg" fullWidth disabled={busy}>
+                        {busy ? "Saving…" : editingId ? "Save changes" : "Add task"}
+                    </Button>
+                )}
+            >
+                {subView && (
+                    <Button variant="ghost" size="sm" onClick={subView.onBack} className="mb-3 -ml-2">
+                        <ChevronLeftIcon aria-hidden="true" /> Back
+                    </Button>
+                )}
+                {editingId ? (
+                    <TaskForm formId={formId} value={editForm} onChange={setEditForm} errors={editErrors} categories={categories}
+                        setCategories={setCategories} setTasks={setTasks} onSubmit={handleEditSubmit} onSubViewChange={setSubView} />
+                ) : (
+                    <TaskForm formId={formId} value={form} onChange={setForm} errors={formErrors} categories={categories}
+                        setCategories={setCategories} setTasks={setTasks} onSubmit={handleAddTask} onSubViewChange={setSubView} />
+                )}
+            </Sheet>
 
-                        <div className="flex justify-between items-center">
-                            {subView ? (
-                                <button type="button" onClick={subView.onBack}
-                                    className="flex items-center gap-1 text-xl font-semibold text-white/80 hover:text-white cursor-pointer">
-                                    <ChevronLeft size={22} /> {subView.title}
-                                </button>
-                            ) : (
-                                <h1 className="text-xl font-semibold">{editingId ? "Edit task" : "Add new task"}</h1>
-                            )}
-                            <div className="flex items-center gap-1">
-                                {editingId && !subView && (
-                                    <button type="button" title="Delete task"
-                                        onClick={() => { const t = tasks.find(t => t.id === editingId); if (t) setConfirmDelete(t); }}
-                                        className="p-1 rounded-md text-white/50 hover:text-red-400 hover:bg-red-500/15 cursor-pointer">
-                                        <Trash size={20} />
-                                    </button>
-                                )}
-                                <button className="cursor-pointer" onClick={closeForm}>
-                                    <X size={24} />
-                                </button>
-                            </div>
-                        </div>
-                        {editingId ? (
-                            <TaskForm value={editForm} onChange={setEditForm} errors={editErrors} categories={categories} setCategories={setCategories} setTasks={setTasks} onSubmit={handleEditSubmit} submitLabel="Save changes" onSubViewChange={setSubView} />
-                        ) : (
-                            <TaskForm value={form} onChange={setForm} errors={formErrors} categories={categories} setCategories={setCategories} setTasks={setTasks} onSubmit={handleAddTask} submitLabel="Add task" onSubViewChange={setSubView} />
-                        )}
-                    </motion.div>,
-                ]}
-            </AnimatePresence>
-
-            {confirmDelete && (
-                <div onClick={() => setConfirmDelete(null)}
-                    className="fixed inset-0 z-60 grid place-items-center bg-black/70 backdrop-blur-sm p-4">
-                    <div onClick={e => e.stopPropagation()}
-                        className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 shadow-2xl">
-                        <h2 className="text-lg font-semibold">Delete task?</h2>
-                        <p className="mt-1 text-sm text-white/60">
-                            &ldquo;{confirmDelete.name}&rdquo; will be permanently removed. This can&apos;t be undone.
-                        </p>
-                        <div className="flex gap-2 mt-6">
-                            <button type="button" onClick={() => setConfirmDelete(null)}
-                                className="flex-1 py-1.5 rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/25 cursor-pointer">
-                                Cancel
-                            </button>
-                            <button type="button" onClick={() => { const t = confirmDelete; setConfirmDelete(null); deleteTask(t); if (editingId === t.id) closeForm(); }}
-                                className="flex-1 py-1.5 rounded-lg bg-red-500/80 hover:bg-red-500 text-white cursor-pointer">
-                                Delete
-                            </button>
-                        </div>
+            <Sheet
+                open={confirmDelete !== null}
+                onClose={() => setConfirmDelete(null)}
+                title="Delete this task?"
+                footer={
+                    <div className="flex gap-2">
+                        <Button className="flex-1" onClick={() => setConfirmDelete(null)}>Keep it</Button>
+                        <Button variant="danger" className="flex-1" onClick={() => {
+                            const t = confirmDelete;
+                            setConfirmDelete(null);
+                            if (!t) return;
+                            deleteTask(t);
+                            if (editingId === t.id) closeForm();
+                        }}>Delete task</Button>
                     </div>
-                </div>
-            )}
-        </>,
-        document.body,
+                }
+            >
+                <p className="text-body text-ink">
+                    &ldquo;{confirmDelete?.name}&rdquo; will be removed for good. This can&apos;t be undone.
+                </p>
+            </Sheet>
+        </>
     );
 });
 

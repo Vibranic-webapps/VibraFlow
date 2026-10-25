@@ -3,6 +3,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import AuthShell, { AUTH_LINK_CLASS } from "./AuthShell";
+import AuthField from "./AuthField";
+import AuthSubmitButton from "./AuthSubmitButton";
 
 type Mode = "login" | "signup";
 
@@ -59,76 +62,49 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 bg-(--void) text-white">
-            <form
-                onSubmit={handleSubmit}
-                className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-8 flex flex-col gap-5"
-            >
-                <div className="text-center">
-                    <h1 className="text-2xl font-semibold">{c.title}</h1>
-                    <p className="text-white/50 text-sm mt-1">{c.subtitle}</p>
-                </div>
+        <AuthShell title={c.title} subtitle={c.subtitle}>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <AuthField
+                    label="Email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
+                    inputMode="email"
+                    disabled={submitting}
+                />
+                <AuthField
+                    label="Password"
+                    type="password"
+                    required
+                    minLength={mode === "signup" ? 8 : undefined}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                    hint={mode === "signup" ? "At least 8 characters" : undefined}
+                    disabled={submitting}
+                />
 
-                <label className="flex flex-col gap-1.5 text-sm">
-                    <span className="text-white/70">Email</span>
-                    <input
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        autoComplete="email"
-                        className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 outline-none focus:border-(--vibranic) transition-colors"
-                    />
-                </label>
-
-                <label className="flex flex-col gap-1.5 text-sm">
-                    <span className="text-white/70">Password</span>
-                    <input
-                        type="password"
-                        required
-                        minLength={mode === "signup" ? 8 : undefined}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                        className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 outline-none focus:border-(--vibranic) transition-colors"
-                    />
-                    {mode === "signup" && (
-                        <span className="text-white/40 text-xs">At least 8 characters</span>
-                    )}
-                </label>
-
-                {/* Login only. Negative margins pull the 44px tap target up under the field. */}
                 {mode === "login" && (
-                    <Link
-                        href="/forgot-password"
-                        className="-mt-4 -mb-2 inline-flex min-h-11 items-center self-end text-sm text-white/50 hover:text-(--vibranic) hover:underline"
-                    >
+                    <Link href="/forgot-password" className={`${AUTH_LINK_CLASS} self-end`}>
                         Forgot password?
                     </Link>
                 )}
 
-                <button
-                    type="submit"
-                    disabled={submitting}
-                    className="mt-2 rounded-lg bg-(--vibranic) py-2.5 font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
-                >
-                    {submitting ? "Please wait…" : c.submit}
-                </button>
-
-                <p className="text-center text-sm text-white/50">
-                    {c.altText}{" "}
-                    <Link href={c.altHref} className="text-(--vibranic) hover:underline">
-                        {c.altLabel}
-                    </Link>
-                </p>
-
-                <p className="text-center text-xs text-white/30">
-                    By continuing you agree to our{" "}
-                    <Link href="/terms" className="underline hover:text-white/60">Terms</Link>{" "}
-                    and{" "}
-                    <Link href="/privacy" className="underline hover:text-white/60">Privacy Policy</Link>.
-                </p>
+                <AuthSubmitButton loading={submitting}>{c.submit}</AuthSubmitButton>
             </form>
-        </div>
+
+            <p className="text-center text-body text-ink-soft">
+                {c.altText}{" "}
+                <Link href={c.altHref} className={AUTH_LINK_CLASS}>{c.altLabel}</Link>
+            </p>
+
+            <p className="text-center text-caption text-ink-soft">
+                By continuing you agree to our{" "}
+                <Link href="/terms" className="underline">Terms</Link> and{" "}
+                <Link href="/privacy" className="underline">Privacy Policy</Link>.
+            </p>
+        </AuthShell>
     );
 }

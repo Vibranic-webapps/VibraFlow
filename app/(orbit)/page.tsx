@@ -6,15 +6,31 @@ import { useTodoStates } from "@/app/hooks/useTodoStates";
 import ListView from "@/app/components/tasks/ListView";
 import CalendarView from "@/app/components/CalendarView";
 import TodoView from "@/app/components/TodoView";
-import LogoutButton from "@/app/components/auth/LogoutButton";
-import { LayoutList, Calendar, CircleCheckBig } from "lucide-react"
+import AccountMenu from "@/app/components/auth/AccountMenu";
+import { TabBar, type TabItem } from "@/app/components/ui/TabBar";
+import { BoardIcon, CalendarIcon, CheckIcon } from "@/app/components/ui/icons";
+
+type View = "tasks" | "calendar" | "categories" | "todos";
+
+// Phase 1 tab labels match today's content. Phase 2 swaps these for Board / Calendar / Backpack.
+const PHASE1_TABS: TabItem[] = [
+    { id: "tasks", label: "Tasks", icon: <BoardIcon /> },
+    { id: "calendar", label: "Calendar", icon: <CalendarIcon /> },
+    { id: "todos", label: "Todos", icon: <CheckIcon /> },
+];
+
+const VIEW_TITLES: Record<View, string> = {
+    tasks: "Tasks",
+    calendar: "Calendar",
+    categories: "Categories",
+    todos: "Todos",
+};
 
 export default function Page() {
     const { tasks, setTasks, loading: tasksLoading } = useTasks();
     const { categories, setCategories } = useCategories();
     const { states, setStates, loading: statesLoading } = useTodoStates();
-    const [view, setView] = useState<"tasks" | "calendar" | "categories" | "todos">("tasks");
-    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [view, setView] = useState<View>("tasks");
 
     // Swipe sideways to move between tabs. We ignore swipes that begin inside a
     // horizontally-scrollable region (calendar time grid, todos board) so those
@@ -44,32 +60,28 @@ export default function Page() {
     };
 
     return (
-        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
-            className={`transition-[margin] duration-300 ease-out ${drawerOpen ? "lg:mr-122.5" : "mr-0"}`}>
-            <div className="flex items-center justify-center gap-3 p-4">
-                <div className="inline-flex gap-1 p-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
-                    <button onClick={() => setView("tasks")} className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${view === "tasks" ? "text-(--vibranic) drop-shadow-[0_0_8px_var(--vibranic)]" : "text-white/50 hover:text-white"}`}>
-                        <LayoutList size={16} />
-                        <span className="hidden sm:inline">Tasks</span>
-                    </button>
-                    <button onClick={() => setView("calendar")} className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${view === "calendar" ? "text-(--vibranic) drop-shadow-[0_0_8px_var(--vibranic)]" : "text-white/50 hover:text-white"}`}>
-                        <Calendar size={16} />
-                        <span className="hidden sm:inline">Calendar</span>
-                    </button>
-                    <button onClick={() => setView("todos")} className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${view === "todos" ? "text-(--vibranic) drop-shadow-[0_0_8px_var(--vibranic)]" : "text-white/50 hover:text-white"}`}>
-                        <CircleCheckBig size={16} />
-                        <span className="hidden sm:inline">Todos</span>
-                    </button>
-                </div>
-                <LogoutButton />
-            </div>
-            {view === "tasks" && <ListView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} loading={tasksLoading} onDrawerOpenChange={setDrawerOpen} />}
-            {view === "calendar" && <CalendarView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} onDrawerOpenChange={setDrawerOpen} />}
-            {view === "todos" && (
-                <div className="w-full max-w-360 mx-auto">
-                    <TodoView tasks={tasks} setTasks={setTasks} states={states} setStates={setStates} loading={statesLoading} />
-                </div>
-            )}
+        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} className="flex min-h-0 flex-1 flex-col">
+            <header className="flex shrink-0 items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2">
+                <h1 className="font-title min-w-0 truncate text-heading font-semibold text-ink">{VIEW_TITLES[view]}</h1>
+                <AccountMenu />
+            </header>
+            {/* The ONE scroll area. A view that wants the full height (calendar) fills it with flex-1 + min-h-0. */}
+            <main className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-none">
+                {view === "tasks" && <ListView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} loading={tasksLoading} />}
+                {view === "calendar" && <CalendarView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} />}
+                {view === "todos" && (
+                    <div className="w-full">
+                        <TodoView tasks={tasks} setTasks={setTasks} states={states} setStates={setStates} loading={statesLoading} />
+                    </div>
+                )}
+            </main>
+            <TabBar
+                active={view}
+                items={PHASE1_TABS}
+                onSelect={(id) => setView(id as View)}
+                label="Main"
+                className="shrink-0"
+            />
         </div>
     );
 }

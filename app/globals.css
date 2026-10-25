@@ -1,22 +1,7 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --void: #05060D;
-  --space: #0A0C18;
-  --space-raised: #12152A;
-  --nebula-violet: #2A1A4A;
-  --nebula-blue: #122A4A;
-  --vibranic: #7C6CFF;
-  --text-primary: #EAECF5;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
-  --font-display: var(--font-space-grotesk);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -27,35 +12,243 @@ html, body {
 }
 
 body {
-  background: var(--void);
-  color: var(--text-primary);
+  background: var(--paper);   /* paper, so there is no dark flash behind the app */
+  color: var(--ink);
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-space-grotesk), var(--font-inter), sans-serif;
-  letter-spacing: -0.01em;
+/* =====================================================================
+   COZY WORLD DESIGN SYSTEM  (Phase 1, 2026-10-25)
+   Source of truth: 03 Design/(C) Cozy World - Phase 0 Mockups.html
+   Names = roles, not values. Day only (no dark mode). Violet = --stamp-* only.
+   Components use the Tailwind classes below; they never use raw hex or box-shadow.
+   ===================================================================== */
+:root {
+  /* paper + surfaces */
+  --paper:         #F1E6CC;   /* page parchment */
+  --backdrop:      #E9DFC4;   /* desktop backdrop around the phone column */
+  --surface:       #F8F0DB;   /* card */
+  --surface-raised:#FFF8E4;   /* inputs, pressed / highlighted card */
+  --surface-sunk:  #E7D8B2;   /* wells, disabled, done */
+  --surface-edge:  #C9B386;   /* hairlines on parchment (decoration) */
+  /* ink */
+  --ink:           #2E2A24;
+  --ink-soft:      #5E5444;   /* secondary text */
+  --ink-faint:     #857A66;   /* decoration only, never text */
+  --on-accent:     #2E2A24;   /* text on harvest orange (never white) */
+  /* accent: harvest orange */
+  --accent:        #E9A03B;
+  --accent-deep:   #B4690F;   /* large/bold orange text only */
+  --accent-soft:   #F6D9A3;
+  /* world materials */
+  --wood:          #7A5A3A;
+  --wood-dark:     #4E3922;
+  --wood-light:    #A67F55;
+  --forest:        #4E6B3A;
+  --forest-soft:   #8FA66F;
+  --water:         #3E5C7A;   /* dusty blue, also the focus ring */
+  --brick:         #B65A3C;   /* world art only; text uses --danger */
+  /* calm board / world backgrounds */
+  --land:          #D3D8A9;
+  --land-2:        #C6CD98;
+  --land-3:        #B8C189;
+  --trail:         #E8DBB4;
+  --trail-rim:     #C6B27F;
+  --sea:           #A9C3C4;
+  --sea-2:         #96B4B6;
+  --sand:          #E4D3A0;
+  /* folded paper (unexplored chapter) */
+  --fold-a:        #EEDFB8;
+  --fold-b:        #DCC99B;
+  --fold-crease:   #B39B66;
+  --fold-print:    #F2CF86;
+  --fold-cloud:    #F8F0DB;
+  /* the ONE violet: future wax stamp only */
+  --stamp:         #7A4FD0;
+  --stamp-deep:    #4F2FA0;
+  --stamp-hi:      #A98BEA;
+  /* feedback (never colour only: always icon + words) */
+  --ok:            #4E6B3A;
+  --warn:          #B4690F;   /* large/bold or with icon; not for small text */
+  --danger:        #9C4429;   /* darker brick: 5.65:1 on --surface (brick itself is 4.09) */
+  --scrim:         rgba(46, 42, 36, 0.58);
+
+  /* shape */
+  --r-card: 14px;
+  --r-sign: 7px;
+  --r-btn: 12px;
+  --r-input: 10px;
+  --r-sheet: 22px;
+  --r-pill: 999px;
+  --line: 2px;                /* the outline: same weight as the character */
+
+  /* elevation: the only place raw shadows live */
+  --lift:      0 3px 0 rgba(46, 42, 36, 0.30);
+  --lift-sm:   0 2px 0 rgba(46, 42, 36, 0.30);
+  --lift-down: 0 1px 0 rgba(46, 42, 36, 0.30);
+  --lift-up:   0 -3px 0 rgba(46, 42, 36, 0.18);   /* bottom sheet */
+
+  /* press state: element sinks by --press-y and its shadow flattens to --lift-down */
+  --press-y: 2px;
+
+  /* space: 4px base. Tailwind's default scale already matches (p-4 = 16px). */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px;
+  --tap: 44px;                /* minimum tap target */
+
+  /* motion */
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --t-tap: 120ms;
+  --t-pop: 220ms;
+
+  /* font stacks (the next/font variables are set in layout.tsx) */
+  --ff-title: var(--font-fredoka), "Baloo 2", ui-rounded, system-ui, sans-serif;
+  --ff-sticker: var(--font-caveat-brush), "Segoe Print", cursive;
+
+  /* paper grain (SVG noise, parchment tinted) */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .3  0 0 0 0 .22  0 0 0 0 .12  0 0 0 .55 0'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.5'/></svg>");
 }
 
-.scroll-space {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--vibranic) 45%, transparent) transparent;
-}
-.scroll-space::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.scroll-space::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scroll-space::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--vibranic) 35%, transparent);
-  border-radius: 9999px;
-}
-.scroll-space::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--vibranic) 60%, transparent);
+@theme inline {
+  /* colours -> bg-surface, text-ink, border-ink, ... */
+  --color-paper: var(--paper);
+  --color-backdrop: var(--backdrop);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-surface-edge: var(--surface-edge);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-on-accent: var(--on-accent);
+  --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-soft: var(--accent-soft);
+  --color-wood: var(--wood);
+  --color-wood-dark: var(--wood-dark);
+  --color-wood-light: var(--wood-light);
+  --color-forest: var(--forest);
+  --color-forest-soft: var(--forest-soft);
+  --color-water: var(--water);
+  --color-brick: var(--brick);
+  --color-land: var(--land);
+  --color-land-2: var(--land-2);
+  --color-land-3: var(--land-3);
+  --color-trail: var(--trail);
+  --color-trail-rim: var(--trail-rim);
+  --color-sea: var(--sea);
+  --color-sea-2: var(--sea-2);
+  --color-sand: var(--sand);
+  --color-fold-a: var(--fold-a);
+  --color-fold-b: var(--fold-b);
+  --color-fold-crease: var(--fold-crease);
+  --color-fold-print: var(--fold-print);
+  --color-fold-cloud: var(--fold-cloud);
+  --color-stamp: var(--stamp);
+  --color-stamp-deep: var(--stamp-deep);
+  --color-stamp-hi: var(--stamp-hi);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-scrim: var(--scrim);
+
+  /* radii -> rounded-card, rounded-btn, ... */
+  --radius-card: var(--r-card);
+  --radius-sign: var(--r-sign);
+  --radius-btn: var(--r-btn);
+  --radius-input: var(--r-input);
+  --radius-sheet: var(--r-sheet);
+  --radius-pill: var(--r-pill);
+
+  /* elevation -> shadow-lift, shadow-lift-sm, shadow-lift-down, shadow-lift-up */
+  --shadow-lift: var(--lift);
+  --shadow-lift-sm: var(--lift-sm);
+  --shadow-lift-down: var(--lift-down);
+  --shadow-lift-up: var(--lift-up);
+
+  /* fonts -> font-title (Fredoka 600), font-sticker (Caveat Brush). Body stays font-sans (Inter). */
+  --font-title: var(--ff-title);
+  --font-sticker: var(--ff-sticker);
+
+  /* type scale -> text-caption ... text-hero */
+  --text-caption: 13px;
+  --text-caption--line-height: 1.3;
+  --text-body: 16px;
+  --text-body--line-height: 1.45;
+  --text-lead: 18px;
+  --text-lead--line-height: 1.35;
+  --text-title: 20px;
+  --text-title--line-height: 1.15;
+  --text-heading: 24px;
+  --text-heading--line-height: 1.1;
+  --text-display: 30px;
+  --text-display--line-height: 1.08;
+  --text-hero: 38px;
+  --text-hero--line-height: 1.05;
+
+  /* phone-width column -> max-w-column */
+  --container-column: 27rem;
+
+  /* motion -> animate-sheet-in, animate-scrim-in (ease tokens: ease-(--ease-pop)) */
+  --animate-sheet-in: sheet-in var(--t-pop) var(--ease-out);
+  --animate-scrim-in: scrim-in var(--t-pop) ease-out;
 }
 
-@keyframes urgency-pulse {
-  0%, 100% { box-shadow: 0 0 12px var(--c), 0 0 24px color-mix(in srgb, var(--c) 50%, transparent); }
-  50%      { box-shadow: 0 0 22px var(--c), 0 0 48px color-mix(in srgb, var(--c) 75%, transparent); }
+/* Unlayered on purpose so the cozy fonts always win over any layered font-family. */
+.font-title { font-family: var(--ff-title); }
+.font-sticker { font-family: var(--ff-sticker); }
+
+/* Outline: the 2px ink line. Pair with border-ink (or border-danger etc.). */
+@utility line {
+  border-width: var(--line);
+  border-style: solid;
+}
+@utility line-t {
+  border-top-width: var(--line);
+  border-style: solid;
+}
+@utility line-b {
+  border-bottom-width: var(--line);
+  border-style: solid;
+}
+
+/* Paper grain texture. Pair with a bg-* colour. */
+@utility bg-grain {
+  background-image: var(--grain);
+}
+
+/* Press state: sinks and flattens its shadow. Every tappable thing uses this.
+   [data-force-pressed] only exists so the /design page can show the state without a finger. */
+@utility press {
+  transition: transform var(--t-tap) ease-out, box-shadow var(--t-tap) ease-out;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  &:active:not(:disabled):not([aria-disabled="true"]),
+  &[data-force-pressed] {
+    transform: translateY(var(--press-y));
+    box-shadow: var(--lift-down);
+  }
+}
+
+/* Visible keyboard / assistive focus ring (dusty blue). */
+@utility focus-ring {
+  &:focus-visible,
+  &[data-force-focus] {
+    outline: 3px solid var(--water);
+    outline-offset: 2px;
+  }
+}
+
+@keyframes sheet-in {
+  from { transform: translateY(24px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes scrim-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press { transition: none; }
+  .press:active:not(:disabled):not([aria-disabled="true"]) { transform: none; }
+  [class*="animate-sheet-in"], [class*="animate-scrim-in"], .animate-pulse { animation: none; }
 }

@@ -3,6 +3,17 @@ import { Task } from "@/app/types";
 import { toast } from "sonner";
 import { toWireDateTimes } from "@/lib/datetime";
 
+/** The API answers 400 with { error: "..." }; show that sentence instead of a generic failure. */
+async function apiErrorMessage(res: Response, fallback: string): Promise<string> {
+    if (res.status !== 400) return fallback;
+    try {
+        const body = await res.json();
+        return typeof body?.error === "string" && body.error ? body.error : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 export function useTaskActions(setTasks: React.Dispatch<React.SetStateAction<Task[]>>) {
     const createTask = async (rawPayload: Record<string, unknown>): Promise<Task | null> => {
         try {
@@ -19,7 +30,7 @@ export function useTaskActions(setTasks: React.Dispatch<React.SetStateAction<Tas
                 toast.success("Task added successfully");
                 return newTask;
             }
-            toast.error("Failed to add task.");
+            toast.error(await apiErrorMessage(res, "Failed to add task."));
             return null;
         } catch (error) {
             console.error("Error adding task:", error);
@@ -47,7 +58,7 @@ export function useTaskActions(setTasks: React.Dispatch<React.SetStateAction<Tas
             }
             // 3a. Server rejected — roll back to the pre-change snapshot.
             setTasks(prev => prev.map(t => (t.id === task.id ? task : t)));
-            toast.error("Failed to update task.");
+            toast.error(await apiErrorMessage(res, "Failed to update task."));
             return null;
         } catch (error) {
             // 3b. Network error — roll back too.
@@ -69,7 +80,7 @@ export function useTaskActions(setTasks: React.Dispatch<React.SetStateAction<Tas
                 toast.success("Task deleted successfully");
                 return true;
             }
-            toast.error("Failed to delete task.");
+            toast.error(await apiErrorMessage(res, "Failed to delete task."));
             return false;
         } catch (error) {
             console.error("Error deleting task:", error);

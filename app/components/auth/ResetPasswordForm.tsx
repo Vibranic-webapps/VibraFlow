@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import AuthShell from "./AuthShell";
+import AuthShell, { AUTH_LINK_CLASS } from "./AuthShell";
 import AuthField from "./AuthField";
 import AuthSubmitButton from "./AuthSubmitButton";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth/constants";
@@ -20,8 +20,6 @@ const COPY = {
     missingTokenBody: "This page needs a reset link from your email. You can request a new one.",
 } as const;
 
-// min-h-11 = 44px tap target
-const LINK_CLASS = "inline-flex min-h-11 items-center text-(--vibranic) hover:underline";
 
 export default function ResetPasswordForm() {
     const router = useRouter();
@@ -40,11 +38,11 @@ export default function ResetPasswordForm() {
     if (!token) {
         return (
             <AuthShell title={COPY.missingTokenTitle}>
-                <p role="status" className="text-center text-sm text-white/70">
+                <p role="status" className="text-center text-body text-ink">
                     {COPY.missingTokenBody}
                 </p>
-                <p className="text-center text-sm">
-                    <Link href="/forgot-password" className={LINK_CLASS}>
+                <p className="text-center text-body">
+                    <Link href="/forgot-password" className={AUTH_LINK_CLASS}>
                         Request a new link
                     </Link>
                 </p>
@@ -96,7 +94,7 @@ export default function ResetPasswordForm() {
 
     return (
         <AuthShell title={COPY.title} subtitle={COPY.subtitle}>
-            <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+            <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
                 <AuthField
                     label="New password"
                     type="password"
@@ -121,12 +119,12 @@ export default function ResetPasswordForm() {
                 />
 
                 {/* Always rendered so screen readers announce the text when it appears */}
-                <p role="alert" className="text-sm text-red-400 empty:hidden -my-2">
+                <p role="alert" className="text-caption font-semibold text-danger empty:hidden">
                     {error}
                 </p>
 
                 {serverRejected && (
-                    <Link href="/forgot-password" className={`${LINK_CLASS} -my-2`}>
+                    <Link href="/forgot-password" className={AUTH_LINK_CLASS}>
                         Request a new link
                     </Link>
                 )}

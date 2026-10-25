@@ -1,4 +1,7 @@
+import { useId } from "react";
 import type { InputHTMLAttributes, Ref } from "react";
+import { Field, CONTROL, hintId } from "@/app/components/ui/Field";
+import { cx } from "@/app/components/ui/cx";
 
 type AuthFieldProps = InputHTMLAttributes<HTMLInputElement> & {
     label: string;
@@ -6,17 +9,18 @@ type AuthFieldProps = InputHTMLAttributes<HTMLInputElement> & {
     inputRef?: Ref<HTMLInputElement>;
 };
 
-// Labelled input styled like the fields in AuthForm.
-export default function AuthField({ label, hint, inputRef, ...inputProps }: AuthFieldProps) {
+// Labelled input for the auth screens: 48px high, 16px text (no iOS zoom), full width.
+export default function AuthField({ label, hint, inputRef, className, ...inputProps }: AuthFieldProps) {
+    const id = useId();
     return (
-        <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-white/70">{label}</span>
+        <Field label={label} id={id} hint={hint}>
             <input
+                id={id}
                 ref={inputRef}
+                aria-describedby={hint ? hintId(id) : undefined}
                 {...inputProps}
-                className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 outline-none focus:border-(--vibranic) transition-colors disabled:opacity-50"
+                className={cx(CONTROL, "h-12", className)}
             />
-            {hint && <span className="text-white/40 text-xs">{hint}</span>}
-        </label>
+        </Field>
     );
 }

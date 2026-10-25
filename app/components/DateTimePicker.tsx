@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { ChevronLeft, CalendarClock, CalendarDays, Clock } from "lucide-react";
 import Calendar from "./Calendar";
 import WheelColumn from "./WheelColumn";
+import { Button } from "@/app/components/ui/Button";
+import { CalendarIcon, ChevronLeftIcon, ClockIcon } from "@/app/components/ui/icons";
 import { parseValue, toDateValue, toDateTimeValue, isSameDay } from "@/app/lib/calendar";
 
 interface DateTimePickerProps {
@@ -58,61 +59,46 @@ export default function DateTimePicker({ mode, value, min, showBack = true, onCa
         : (mode === "datetime" ? "Pick a date & time" : "Pick a date");
 
     return (
-        <div className="mt-4 w-full">
+        <div className="flex w-full min-w-0 flex-col gap-4">
             {showBack && (
-                <button type="button" onClick={onCancel}
-                    className="flex items-center gap-1 text-white/70 hover:text-white mb-4 cursor-pointer">
-                    <ChevronLeft size={18} /> Back
-                </button>
+                <Button variant="ghost" size="sm" onClick={onCancel} className="self-start">
+                    <ChevronLeftIcon /> Back
+                </Button>
             )}
 
-            <div className="flex items-center gap-2 mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                {mode === "datetime"
-                    ? <CalendarClock size={18} className="text-(--vibranic) shrink-0" />
-                    : <CalendarDays size={18} className="text-(--vibranic) shrink-0" />}
-                <span className={`text-sm ${draft ? "text-white/90" : "text-white/40"}`}>{preview}</span>
+            {/* what you have picked so far, in words */}
+            <div className="line flex items-center gap-2 rounded-input border-ink bg-surface-raised px-3.5 py-2.5" aria-live="polite">
+                {mode === "datetime" ? <ClockIcon className="text-ink" /> : <CalendarIcon className="text-ink" />}
+                <span className={`min-w-0 text-body font-semibold ${draft ? "text-ink" : "text-ink-soft"}`}>{preview}</span>
             </div>
 
-            <div className="flex gap-4">
-                <div className="flex-1">
-                    <Calendar selected={draft} onSelect={handleDay} min={min} />
-                </div>
+            <Calendar selected={draft} onSelect={handleDay} min={min} />
 
-                {mode === "datetime" && (
-                    <div className="flex flex-col">
-                        <div className="flex items-center mt-1 justify-center gap-1 text-white text-sm mb-5.25">
-                            <Clock size={14} /> <span>Time</span>
-                        </div>
-                        <div className="flex items-start justify-center gap-2">
-                            <WheelColumn ariaLabel="Hours" label="Hour" values={HOURS}
-                                value={draft ? draft.getHours() : 0}
-                                isDisabled={hourDisabled}
-                                onChange={(h) => setTime(h, draft ? draft.getMinutes() : 0)} />
-                            <span className="text-white/40 text-lg mt-24.5">:</span>
-                            <WheelColumn ariaLabel="Minutes" label="Min" values={MINUTES}
-                                value={draft ? draft.getMinutes() : 0}
-                                isDisabled={minuteDisabled}
-                                onChange={(m) => setTime(draft ? draft.getHours() : 0, m)} />
-                        </div>
+            {mode === "datetime" && (
+                <div className="flex flex-col gap-1">
+                    <h3 className="font-title flex items-center gap-1.5 text-lead font-semibold text-ink">
+                        <ClockIcon width={18} height={18} /> Time
+                    </h3>
+                    <div className="flex items-start justify-center gap-3">
+                        <WheelColumn ariaLabel="Hours" label="Hour" values={HOURS}
+                            value={draft ? draft.getHours() : 0}
+                            isDisabled={hourDisabled}
+                            onChange={(h) => setTime(h, draft ? draft.getMinutes() : 0)} />
+                        <span aria-hidden="true" className="mt-9 text-title font-bold text-ink">:</span>
+                        <WheelColumn ariaLabel="Minutes" label="Min" values={MINUTES}
+                            value={draft ? draft.getMinutes() : 0}
+                            isDisabled={minuteDisabled}
+                            onChange={(m) => setTime(draft ? draft.getHours() : 0, m)} />
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
-            <div className="flex gap-2 mt-6">
+            <div className="line-t sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-wrap gap-2 border-ink bg-surface px-4 pt-3 pb-4">
                 {onClear && value && (
-                    <button type="button" onClick={onClear}
-                        className="py-1.5 px-3 rounded border border-white/10 text-white/50 hover:text-red-400 hover:border-red-400/40 cursor-pointer">
-                        Clear
-                    </button>
+                    <Button variant="ghost" onClick={onClear} className="text-danger">Clear</Button>
                 )}
-                <button type="button" onClick={onCancel}
-                    className="flex-1 py-1.5 rounded border border-white/10 text-white/70 hover:text-white hover:border-white/25 cursor-pointer">
-                    Cancel
-                </button>
-                <button type="button" onClick={confirm} disabled={!draft}
-                    className="flex-1 py-1.5 rounded bg-(--vibranic) text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
-                    Confirm
-                </button>
+                <Button onClick={onCancel} className="flex-1">Cancel</Button>
+                <Button variant="primary" onClick={confirm} disabled={!draft} className="flex-1">Confirm</Button>
             </div>
         </div>
     );

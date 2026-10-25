@@ -14,7 +14,7 @@ const JURISDICTION = "Belgium";
 export default function TermsPage() {
     return (
         <LegalPage title="Terms of Service" updated="27 August 2026">
-            <p className="text-white/70">
+            <p className="text-ink">
                 These Terms of Service (&ldquo;Terms&rdquo;) govern your use of VibraFlow (the
                 &ldquo;Service&rdquo;), operated by {OWNER}. By creating an account or using the Service,
                 you agree to these Terms. If you do not agree, please do not use the Service.
@@ -37,7 +37,7 @@ export default function TermsPage() {
             </Section>
 
             <Section title="5. Availability and &ldquo;as is&rdquo;">
-                <p>The Service is provided <strong className="text-white/90">&ldquo;as is&rdquo; and &ldquo;as available&rdquo;</strong>, without warranties of any kind. We do not guarantee that it will be uninterrupted, error-free, or that data will never be lost. Keep your own backups of anything important.</p>
+                <p>The Service is provided <strong className="text-ink">&ldquo;as is&rdquo; and &ldquo;as available&rdquo;</strong>, without warranties of any kind. We do not guarantee that it will be uninterrupted, error-free, or that data will never be lost. Keep your own backups of anything important.</p>
             </Section>
 
             <Section title="6. Limitation of liability">
@@ -57,8 +57,8 @@ export default function TermsPage() {
             </Section>
 
             <Section title="10. Contact">
-                <p>Questions about these Terms? Email <a href={`mailto:${CONTACT}`} className="text-(--vibranic) hover:underline">{CONTACT}</a>.</p>
-                <p className="text-sm text-white/40">See also our <Link href="/privacy" className="text-(--vibranic) hover:underline">Privacy Policy</Link>.</p>
+                <p>Questions about these Terms? Email <a href={`mailto:${CONTACT}`} className="font-semibold text-accent-deep underline">{CONTACT}</a>.</p>
+                <p className="text-caption text-ink-soft">See also our <Link href="/privacy" className="font-semibold text-accent-deep underline">Privacy Policy</Link>.</p>
             </Section>
         </LegalPage>
     );

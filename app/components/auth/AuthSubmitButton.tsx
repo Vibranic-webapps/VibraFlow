@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import { Button } from "@/app/components/ui/Button";
 
-// Primary button styled like the submit button in AuthForm.
+// The one primary button of an auth screen. Disabled while the request runs, so it can't be sent twice.
 export default function AuthSubmitButton({
     loading,
     loadingLabel = "Please wait…",
@@ -11,12 +12,8 @@ export default function AuthSubmitButton({
     children: ReactNode;
 }) {
     return (
-        <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 rounded-lg bg-(--vibranic) py-2.5 font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-        >
+        <Button type="submit" variant="primary" size="lg" fullWidth disabled={loading}>
             {loading ? loadingLabel : children}
-        </button>
+        </Button>
     );
 }

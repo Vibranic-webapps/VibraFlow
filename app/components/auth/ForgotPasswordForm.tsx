@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import AuthShell from "./AuthShell";
+import AuthShell, { AUTH_LINK_CLASS } from "./AuthShell";
 import AuthField from "./AuthField";
 import AuthSubmitButton from "./AuthSubmitButton";
 
@@ -15,8 +15,6 @@ const COPY = {
     genericError: "Something went wrong",
 } as const;
 
-// min-h-11 = 44px tap target
-const LINK_CLASS = "inline-flex min-h-11 items-center text-(--vibranic) hover:underline";
 
 export default function ForgotPasswordForm() {
     const [email, setEmail] = useState("");
@@ -51,11 +49,11 @@ export default function ForgotPasswordForm() {
     return (
         <AuthShell title={COPY.title} subtitle={sent ? undefined : COPY.subtitle}>
             {sent ? (
-                <p role="status" className="text-center text-sm text-white/70">
+                <p role="status" className="text-center text-body text-ink">
                     {COPY.sent}
                 </p>
             ) : (
-                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <AuthField
                         label="Email"
                         type="email"
@@ -68,7 +66,7 @@ export default function ForgotPasswordForm() {
                     />
 
                     {/* Always rendered so screen readers announce the text when it appears */}
-                    <p role="alert" className="text-sm text-red-400 empty:hidden -my-2">
+                    <p role="alert" className="text-caption font-semibold text-danger empty:hidden">
                         {error}
                     </p>
 
@@ -76,8 +74,8 @@ export default function ForgotPasswordForm() {
                 </form>
             )}
 
-            <p className="text-center text-sm text-white/50">
-                <Link href="/login" className={LINK_CLASS}>
+            <p className="text-center text-body">
+                <Link href="/login" className={AUTH_LINK_CLASS}>
                     Back to sign in
                 </Link>
             </p>
