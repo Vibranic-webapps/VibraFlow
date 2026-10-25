@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter, Geist_Mono, Fredoka, Caveat_Brush } from "next/font/google";
 import { Toaster } from "sonner";
+import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
 const inter = Inter({
@@ -35,6 +36,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "VibraFlow",
   description: "VibraFlow — a personal planner for tasks, calendar, and goals.",
+  manifest: "/manifest.webmanifest",
+  // iOS home-screen app: full screen, light status bar text on paper.
+  appleWebApp: { capable: true, title: BRAND.name, statusBarStyle: "default" },
+};
+
+// viewportFit "cover" lets the app draw under the notch; the shell pads with env(safe-area-inset-*).
+// No maximumScale / userScalable: pinch zoom stays available (accessibility).
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: BRAND.paper,
 };
 
 export default function RootLayout({
@@ -45,12 +58,29 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} ${fredoka.variable} ${caveatBrush.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${spaceGrotesk.variable} ${fredoka.variable} ${caveatBrush.variable} ${geistMono.variable} h-full bg-paper antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-paper text-ink">
         {children}
-        <Toaster richColors position="top-right" />
+        <Toaster
+          position="top-center"
+          offset="calc(env(safe-area-inset-top) + 12px)"
+          mobileOffset="calc(env(safe-area-inset-top) + 12px)"
+          toastOptions={{
+            unstyled: true,
+            classNames: {
+              toast:
+                "line bg-grain flex w-full max-w-column items-center gap-3 rounded-card border-ink bg-surface px-4 py-3 text-body text-ink shadow-lift font-sans",
+              title: "font-semibold",
+              description: "text-caption text-ink-soft",
+              success: "bg-surface",
+              error: "border-danger text-danger",
+              actionButton: "line press rounded-btn border-ink bg-accent px-3 py-2 text-on-accent",
+              cancelButton: "line press rounded-btn border-ink bg-surface px-3 py-2 text-ink",
+            },
+          }}
+        />
       </body>
     </html>
   );

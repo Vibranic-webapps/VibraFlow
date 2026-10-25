@@ -95,3 +95,11 @@ export const ChevronDownIcon = (p: IconProps) => (
         <path d="M6 9.5l6 6 6-6" />
     </Icon>
 );
+
+/** Account: head and shoulders. */
+export const AccountIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" />
+    </Icon>
+);

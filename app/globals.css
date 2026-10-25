@@ -27,7 +27,7 @@ html, body {
 }
 
 body {
-  background: var(--void);
+  background: var(--paper);   /* paper, so there is no dark flash behind the app */
   color: var(--text-primary);
 }
 
