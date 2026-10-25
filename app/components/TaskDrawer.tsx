@@ -7,6 +7,7 @@ import { Task, Category, TaskFormValues, FormErrors } from "@/app/types";
 import TaskForm, { type SubView } from "./TaskForm";
 import { useTaskActions } from "@/app/hooks/useTaskActions";
 import { toast } from "sonner";
+import { isoToLocalInput, isoToDateOnly } from "@/lib/datetime";
 
 export const initialForm: TaskFormValues = {
     name: "",
@@ -57,8 +58,9 @@ function validateTask(form: TaskFormValues): FormErrors {
         if (form.frequency === "WEEKLY" && form.byWeekday.length === 0) {
             errors.byWeekday = "Pick at least one weekday.";
         }
+        // Compare calendar dates as strings (YYYY-MM-DD sorts correctly); same day is allowed.
         if (form.recurrenceEnd && form.startDateTime &&
-            new Date(form.recurrenceEnd) < new Date(form.startDateTime)) {
+            form.recurrenceEnd < form.startDateTime.slice(0, 10)) {
             errors.recurrenceEnd = "Repeat-until can't be before the start date.";
         }
     }
@@ -120,14 +122,14 @@ const TaskDrawer = forwardRef<TaskDrawerHandle, TaskDrawerProps>(function TaskDr
             setEditForm({
                 name: task.name,
                 description: task.description ?? "",
-                startDateTime: task.startDateTime?.slice(0, 16) ?? "",
-                endDateTime: task.endDateTime?.slice(0, 16) ?? "",
+                startDateTime: task.startDateTime ? isoToLocalInput(task.startDateTime) : "",
+                endDateTime: task.endDateTime ? isoToLocalInput(task.endDateTime) : "",
                 priority: task.priority,
                 categoryId: task.categoryId ?? "",
                 frequency: task.frequency ?? "",
                 interval: task.interval ?? 1,
                 byWeekday: task.byWeekday,
-                recurrenceEnd: task.recurrenceEnd ? task.recurrenceEnd.slice(0, 10) : "",
+                recurrenceEnd: task.recurrenceEnd ? isoToDateOnly(task.recurrenceEnd) : "",
             });
             setFormOpen(true);
         },

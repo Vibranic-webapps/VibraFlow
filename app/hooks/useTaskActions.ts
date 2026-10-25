@@ -1,10 +1,13 @@
 "use client";
 import { Task } from "@/app/types";
 import { toast } from "sonner";
+import { toWireDateTimes } from "@/lib/datetime";
 
 export function useTaskActions(setTasks: React.Dispatch<React.SetStateAction<Task[]>>) {
-    const createTask = async (payload: Record<string, unknown>): Promise<Task | null> => {
+    const createTask = async (rawPayload: Record<string, unknown>): Promise<Task | null> => {
         try {
+            // Local wall-clock form values -> unambiguous ISO instants (see lib/datetime.ts).
+            const payload = toWireDateTimes(rawPayload);
             const res = await fetch("/api/tasks", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -25,7 +28,9 @@ export function useTaskActions(setTasks: React.Dispatch<React.SetStateAction<Tas
         }
     };
 
-    const updateTask = async (task: Task, updates: Partial<Task>): Promise<Task | null> => {
+    const updateTask = async (task: Task, rawUpdates: Partial<Task>): Promise<Task | null> => {
+        // Local wall-clock form values -> unambiguous ISO instants; unchanged fields keep their stored value.
+        const updates = toWireDateTimes(rawUpdates, task);
         // 1. Optimistic apply — flip the UI immediately, before the network call.
         setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, ...updates } : t)));
         try {
