@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Inter, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Inter, Geist_Mono, Fredoka, Caveat_Brush } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -11,6 +11,20 @@ const inter = Inter({
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
   subsets: ["latin"],
+});
+
+// Cozy display font (titles, numbers). One weight only: 600.
+const fredoka = Fredoka({
+  variable: "--font-fredoka",
+  subsets: ["latin"],
+  weight: "600",
+});
+
+// Stickers only ("Day done!"). Never for UI text.
+const caveatBrush = Caveat_Brush({
+  variable: "--font-caveat-brush",
+  subsets: ["latin"],
+  weight: "400",
 });
 
 const geistMono = Geist_Mono({
@@ -31,7 +45,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${spaceGrotesk.variable} ${fredoka.variable} ${caveatBrush.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
