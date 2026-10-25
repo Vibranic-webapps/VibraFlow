@@ -66,9 +66,9 @@ export default function Page() {
                 <AccountMenu />
             </header>
             {/* The ONE scroll area. A view that wants the full height (calendar) fills it with flex-1 + min-h-0. */}
-            <main className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-none">
-                {view === "tasks" && <ListView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} loading={tasksLoading} onDrawerOpenChange={() => {}} />}
-                {view === "calendar" && <CalendarView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} onDrawerOpenChange={() => {}} />}
+            <main className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-none">
+                {view === "tasks" && <ListView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} loading={tasksLoading} />}
+                {view === "calendar" && <CalendarView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} />}
                 {view === "todos" && (
                     <div className="w-full">
                         <TodoView tasks={tasks} setTasks={setTasks} states={states} setStates={setStates} loading={statesLoading} />

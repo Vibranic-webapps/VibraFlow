@@ -6,7 +6,7 @@
  */
 export default function OrbitLayout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="h-dvh overflow-hidden overscroll-none bg-backdrop">
+        <div className="relative h-dvh overflow-hidden overscroll-none bg-backdrop">
             <div className="bg-grain mx-auto flex h-full w-full max-w-column flex-col overflow-hidden bg-paper pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] text-ink md:line md:border-y-0 md:border-ink">
                 {children}
             </div>

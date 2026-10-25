@@ -5,7 +5,7 @@ import { occursOn, isMultiDay, minutesIntoDay, startTimeLabel } from "@/app/lib/
 import { isSameDay, toDateTimeValue } from "@/app/lib/calendar";
 
 const HOUR_PX = 48;
-const MIN_EVENT_PX = 20;
+const MIN_EVENT_PX = 44; // keeps every event a comfortable touch target
 const SNAP = 15;
 
 // Dynamic hour window: render only the hours around the day's tasks so the grid
@@ -46,8 +46,7 @@ interface DragState {
 
 export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, onCreateAt }: TimeGridViewProps) {
     const now = new Date();
-    const cols = `repeat(${days.length}, minmax(6rem,1fr))`;
-    const rowMinWidth = 56 + days.length * 96;
+    const cols = `repeat(${days.length}, minmax(0, 1fr))`; // always fits the width: no sideways scroll
 
     // Derive the visible hour window from the tasks currently on screen.
     const [startHour, endHour] = useMemo(() => {
@@ -164,39 +163,41 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
     };
 
     return (
-        <div className="rounded-lg border border-white/10 overflow-hidden">
-            <div data-hscroll className="scroll-space overflow-auto" style={{ maxHeight: "70vh" }}>
-                <div className="sticky top-0 z-30 bg-[#0b0e1c]/95 backdrop-blur-sm" style={{ minWidth: rowMinWidth }}>
-                    <div className="flex border-b border-white/10">
-                        <div className="w-14 shrink-0 sticky left-0 z-40 bg-[#0b0e1c]" />
-                            <div className="grid flex-1" style={{ gridTemplateColumns: cols }}>
-                                {days.map((d, i) => {
-                                    const today = isSameDay(d, now);
-                                    return (
-                                        <div key={i} className="px-2 py-1.5 text-center border-l border-white/10">
-                                            <div className="text-[11px] uppercase tracking-wide text-white/40">
-                                                {d.toLocaleDateString("en-US", { weekday: "short" })}
-                                            </div>
-                                            <div className={`text-sm ${today ? "text-(--vibranic) font-semibold" : "text-white/80"}`}>
-                                                {d.getDate()}
-                                            </div>
+        // The parent gives this a bounded height; this is the ONE vertical scroller of the view.
+        <div className="line flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-surface">
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none">
+                <div className="sticky top-0 z-30 bg-surface">
+                    <div className="line-b flex">
+                        <div className="w-12 shrink-0" />
+                        <div className="grid min-w-0 flex-1" style={{ gridTemplateColumns: cols }}>
+                            {days.map((d, i) => {
+                                const today = isSameDay(d, now);
+                                return (
+                                    <div key={i} className={`border-l border-surface-edge px-1 py-1.5 text-center ${today ? "bg-accent-soft" : ""}`}>
+                                        <div className="text-caption font-semibold text-ink-soft uppercase">
+                                            {d.toLocaleDateString("en-US", { weekday: "short" })}
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                        <div className={`font-title text-lead font-semibold ${today ? "text-accent-deep" : "text-ink"}`}>
+                                            {d.getDate()}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
 
-                    <div className="flex border-b border-white/10 bg-white/2">
-                        <div className="w-14 shrink-0 sticky left-0 z-40 bg-[#0b0e1c] grid place-items-center text-[10px] text-white/30">all-day</div>
-                        <div className="grid flex-1" style={{ gridTemplateColumns: cols }}>
+                    <div className="line-b flex bg-surface-sunk">
+                        <div className="grid w-12 shrink-0 place-items-center text-caption text-ink-soft">all-day</div>
+                        <div className="grid min-w-0 flex-1" style={{ gridTemplateColumns: cols }}>
                             {days.map((d, i) => (
-                                <div key={i} className="border-l border-white/10 p-1 flex flex-col gap-0.5 min-h-7">
+                                <div key={i} className="flex min-h-11 min-w-0 flex-col gap-1 border-l border-surface-edge p-1">
                                     {allDayForDay(d).map(t => {
-                                        const color = t.category?.color ?? "#7C6CFF";
+                                        const color = t.category?.color ?? "var(--accent)";
                                         return (
                                             <button key={t.id} type="button" onClick={() => onEditTask(t)}
-                                                style={{ background: `${color}33`, borderLeft: `3px solid ${color}` }}
-                                                className="truncate text-left text-[10px] px-1 rounded-sm text-white/85 hover:brightness-125 cursor-pointer">
+                                                aria-label={t.name}
+                                                style={{ background: `color-mix(in srgb, ${color} 28%, var(--surface))`, borderLeft: `4px solid ${color}` }}
+                                                className={`press focus-ring min-h-11 truncate rounded-input px-1.5 text-left text-caption font-semibold ${t.completed ? "text-ink-soft line-through" : "text-ink"}`}>
                                                 {t.name}
                                             </button>
                                         );
@@ -207,23 +208,23 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
                     </div>
                 </div>
 
-                <div className="flex" style={{ minWidth: rowMinWidth }}>
-                    <div className="w-14 shrink-0 sticky left-0 z-20 bg-[#0b0e1c]">
+                <div className="flex">
+                    <div className="w-12 shrink-0">
                         {visibleHours.map(h => (
                             <div key={h} style={{ height: HOUR_PX }} className="relative">
-                                <span className="absolute -top-1.5 right-1 text-[10px] text-white/30">{hourLabel(h)}</span>
+                                <span className="absolute -top-2 right-1 text-caption whitespace-nowrap text-ink-soft">{hourLabel(h)}</span>
                             </div>
                         ))}
                     </div>
 
-                    <div ref={gridRef} className="relative grid flex-1" style={{ gridTemplateColumns: cols, height: gridHeight }}>
+                    <div ref={gridRef} className="relative grid min-w-0 flex-1" style={{ gridTemplateColumns: cols, height: gridHeight }}>
                         {visibleHours.map(h => (
-                            <div key={h} className="pointer-events-none absolute inset-x-0 border-t border-white/5"
+                            <div key={h} className="pointer-events-none absolute inset-x-0 border-t border-surface-edge"
                                 style={{ top: (h - startHour) * HOUR_PX }} />
                         ))}
 
                         {days.some(d => isSameDay(d, now)) && minutesIntoDay(now) >= winStartMin && minutesIntoDay(now) <= winEndMin && (
-                            <div className="pointer-events-none absolute inset-x-0 z-20 border-t border-red-500/70"
+                            <div className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-danger"
                                 style={{ top: yFromMin(minutesIntoDay(now)) }} />
                         )}
 
@@ -236,7 +237,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
                                 if (ci === draft!.dayIndex) items = [...items, dragTask];
                             }
                             return (
-                            <div key={ci} className="relative border-l border-white/10 cursor-pointer"
+                            <div key={ci} className={`relative min-w-0 border-l border-surface-edge ${isSameDay(day, now) ? "bg-accent-soft/40" : ""}`}
                                 onClick={(e) => {
                                     // Only fire on the empty background — not on events or drag handles.
                                     if (suppressClickRef.current) return;
@@ -265,21 +266,26 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
                                     const vis1 = Math.min(endMin, winEndMin);
                                     const top = yFromMin(vis0);
                                     const height = Math.max(MIN_EVENT_PX, ((vis1 - vis0) / 60) * HOUR_PX);
-                                    const color = t.category?.color ?? "#7C6CFF";
+                                    const color = t.category?.color ?? "var(--accent)";
+                                    // Resize handles are thin drag strips; the body of the event is the big tap target.
                                     const handle = "absolute inset-x-0 h-2 cursor-ns-resize touch-none z-10";
 
                                     return (
                                         <div key={t.id}
-                                            style={{ top, height, background: `${color}33`, borderLeft: `3px solid ${color}` }}
-                                            className={`group absolute left-0.5 right-0.5 overflow-hidden rounded-sm ${live ? "ring-1 ring-(--vibranic) brightness-125" : ""}`}>
+                                            style={{ top, height, background: `color-mix(in srgb, ${color} 28%, var(--surface))`, borderLeft: `4px solid ${color}` }}
+                                            className={`absolute right-0.5 left-0.5 overflow-hidden rounded-input ${live ? "ring-2 ring-accent" : ""}`}>
                                             <div className={`${handle} top-0`}
                                                 onPointerDown={(e) => beginDrag(e, t, "top", baseStart, baseEnd)} />
 
                                             <div
+                                                role="button"
+                                                tabIndex={0}
+                                                aria-label={`${t.name}, ${startTimeLabel(t)}`}
+                                                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEditTask(t); } }}
                                                 onPointerDown={(e) => beginDrag(e, t, "move", baseStart, baseEnd)}
-                                                className={`block w-full h-full px-1 py-0.5 text-left text-[10px] touch-none cursor-grab active:cursor-grabbing hover:brightness-110 ${t.completed ? "line-through text-white/40" : "text-white/90"}`}>
-                                                <span className="font-medium">{t.name}</span>
-                                                <span className="ml-1 text-white/55 tabular-nums">{startTimeLabel(t)}</span>
+                                                className={`focus-ring h-full w-full cursor-grab touch-none px-1 py-0.5 text-left text-caption active:cursor-grabbing ${t.completed ? "text-ink-soft line-through" : "text-ink"}`}>
+                                                <span className="block truncate font-semibold">{t.name}</span>
+                                                <span className="block truncate text-ink-soft tabular-nums">{startTimeLabel(t)}</span>
                                             </div>
 
                                             <div className={`${handle} bottom-0`}

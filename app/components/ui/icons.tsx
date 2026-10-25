@@ -103,3 +103,78 @@ export const AccountIcon = (p: IconProps) => (
         <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" />
     </Icon>
 );
+
+export const PlusIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <path d="M12 5v14M5 12h14" />
+    </Icon>
+);
+
+export const ChevronLeftIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <path d="M14.5 6l-6 6 6 6" />
+    </Icon>
+);
+
+export const ChevronRightIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <path d="M9.5 6l6 6-6 6" />
+    </Icon>
+);
+
+export const RepeatIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <path d="M4 11V9a3 3 0 0 1 3-3h11M15 3l3 3-3 3" />
+        <path d="M20 13v2a3 3 0 0 1-3 3H6M9 21l-3-3 3-3" />
+    </Icon>
+);
+
+export const FlagIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <path d="M6 21V4M6 5h11l-2.5 4L17 13H6" />
+    </Icon>
+);
+
+export const TagIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <path d="M4 12.5V5a1 1 0 0 1 1-1h7.5L20 11.5 12.5 19z" />
+        <circle cx="8.5" cy="8.5" r="1" />
+    </Icon>
+);
+
+export const MoreIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <circle cx="12" cy="5.5" r="1" />
+        <circle cx="12" cy="12" r="1" />
+        <circle cx="12" cy="18.5" r="1" />
+    </Icon>
+);
+
+export const SearchIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="M16 16l4.5 4.5" />
+    </Icon>
+);
+
+export const FilterIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+        <circle cx="16" cy="7" r="2" />
+        <circle cx="8" cy="17" r="2" />
+    </Icon>
+);
+
+export const SortIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <path d="M8 5v14M4.5 15.5L8 19l3.5-3.5M16 19V5M12.5 8.5L16 5l3.5 3.5" />
+    </Icon>
+);
+
+/** Pass `fill="currentColor"` to show it as switched on. */
+export const HeartIcon = (p: IconProps) => (
+    <Icon {...p}>
+        <path d="M12 20s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 7.6 4.2 4.2 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z" />
+    </Icon>
+);
+

@@ -1,8 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef } from "react";
 
-const ITEM_H = 34;
-const VISIBLE = 5;
+// 44px rows so every number is a comfortable tap target; 3 rows keep the whole picker inside the sheet.
+const ITEM_H = 44;
+const VISIBLE = 3;
 
 interface WheelColumnProps {
     values: number[];
@@ -93,17 +94,20 @@ export default function WheelColumn({ values, value, onChange, isDisabled, ariaL
 
     return (
         <div className="flex flex-col items-center gap-1">
-            {label && <span className="text-[11px] uppercase tracking-wide text-white/40">{label}</span>}
-            <div className="relative w-16 mt-2" style={{ height }}>
+            {label && <span className="text-caption font-semibold text-ink-soft">{label}</span>}
+            <div className="relative w-20" style={{ height }}>
+                {/* the highlighted middle row */}
                 <div
-                    className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-md bg-white/5 border border-white/10"
+                    aria-hidden="true"
+                    className="line pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-input border-ink bg-surface-raised"
                     style={{ height: ITEM_H }}
                 />
                 <div
                     ref={ref}
                     role="listbox"
                     aria-label={ariaLabel}
-                    className="h-full overflow-y-auto snap-y snap-mandatory text-center [&::-webkit-scrollbar]:hidden"
+                    tabIndex={0}
+                    className="focus-ring relative h-full snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-input text-center [&::-webkit-scrollbar]:hidden"
                     style={{ scrollbarWidth: "none" }}
                 >
                     <div style={{ height: spacer }} />
@@ -115,9 +119,12 @@ export default function WheelColumn({ values, value, onChange, isDisabled, ariaL
                                 key={v}
                                 role="option"
                                 aria-selected={selected}
+                                aria-disabled={disabled}
                                 onClick={() => { if (!disabled) { scrollToIndex(values.indexOf(v), true); onChange(v); } }}
-                                className={`snap-center snap-always flex items-center justify-center cursor-pointer transition-colors ${
-                                    disabled ? "text-white/20" : selected ? "text-white font-semibold" : "text-white/40"
+                                className={`flex snap-center snap-always items-center justify-center text-lead tabular-nums ${
+                                    disabled
+                                        ? "cursor-not-allowed text-ink-soft line-through opacity-50"
+                                        : selected ? "cursor-pointer font-bold text-ink" : "cursor-pointer text-ink-soft"
                                 }`}
                                 style={{ height: ITEM_H }}
                             >

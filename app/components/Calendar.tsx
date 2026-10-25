@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/app/components/ui/Button";
+import { IconButton } from "@/app/components/ui/IconButton";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/app/components/ui/icons";
 import { useCalendarGrid } from "@/app/hooks/useCalendarGrid";
 import { WEEKDAYS, isSameDay, isDisabled, addDays, toDateValue } from "@/app/lib/calendar";
 
@@ -54,33 +56,24 @@ export default function Calendar({ selected, onSelect, min, max }: CalendarProps
     };
 
     return (
-        <div className="w-full">
-            <header className="flex items-center justify-between mb-3">
-                <div className="flex items-baseline gap-2">
-                    <span className="text-lg font-semibold">
+        <div className="w-full min-w-0">
+            <header className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-baseline gap-2">
+                    <span className="font-title text-title font-semibold text-ink">
                         {viewDate.toLocaleString("en-US", { month: "long" })}
                     </span>
-                    <span className="text-white/50">{year}</span>
+                    <span className="text-body text-ink-soft">{year}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <button type="button" onClick={goToPrevMonth} aria-label="Previous month"
-                        className="p-1.5 rounded-md text-white/70 hover:bg-white/10 hover:text-white cursor-pointer">
-                        <ChevronLeft size={18} />
-                    </button>
-                    <button type="button" onClick={goToToday}
-                        className="px-2 py-1 text-sm rounded-md text-white/70 hover:bg-white/10 hover:text-white cursor-pointer">
-                        Today
-                    </button>
-                    <button type="button" onClick={goToNextMonth} aria-label="Next month"
-                        className="p-1.5 rounded-md text-white/70 hover:bg-white/10 hover:text-white cursor-pointer">
-                        <ChevronRight size={18} />
-                    </button>
+                <div className="flex items-center gap-1.5">
+                    <IconButton label="Previous month" icon={<ChevronLeftIcon />} onClick={goToPrevMonth} />
+                    <Button size="sm" onClick={goToToday}>Today</Button>
+                    <IconButton label="Next month" icon={<ChevronRightIcon />} onClick={goToNextMonth} />
                 </div>
             </header>
 
-            <div className="grid grid-cols-7 gap-1 mb-1" aria-hidden="true">
+            <div className="mb-1 grid grid-cols-7 gap-1" aria-hidden="true">
                 {WEEKDAYS.map((d) => (
-                    <div key={d} className="text-center text-xs font-medium text-white/40 py-1">
+                    <div key={d} className="py-1 text-center text-caption font-semibold text-ink-soft">
                         {d}
                     </div>
                 ))}
@@ -106,17 +99,15 @@ export default function Calendar({ selected, onSelect, min, max }: CalendarProps
                             aria-disabled={disabled}
                             tabIndex={isFocusTarget ? 0 : -1}
                             onClick={() => { if (!disabled) onSelect(date); }}
-                            className={`aspect-square rounded-md text-sm transition-colors focus:outline-none focus:ring-1 focus:ring-(--vibranic) 
-                                ${ disabled
-                                    ? "text-white/20 cursor-not-allowed"
+                            className={`press focus-ring grid h-11 min-w-0 place-items-center rounded-input text-body font-semibold ${
+                                disabled
+                                    ? "cursor-not-allowed text-ink-soft line-through opacity-50"
                                     : isSelected
-                                        ? "bg-(--vibranic) text-white cursor-pointer"
+                                        ? "line border-ink bg-accent text-on-accent shadow-lift-sm"
                                         : isToday
-                                            ? "text-(--vibranic) border border-(--vibranic)/40 hover:bg-white/10 cursor-pointer"
-                                            : "text-white/80 hover:bg-white/10 cursor-pointer"
-                                }
-                                ${!inCurrentMonth ? "opacity-40" : ""}
-                            `}
+                                            ? "line border-ink bg-surface-raised text-ink"
+                                            : "text-ink"
+                            } ${!inCurrentMonth && !isSelected ? "opacity-50" : ""}`}
                         >
                             {date.getDate()}
                         </button>

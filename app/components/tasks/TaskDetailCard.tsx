@@ -1,220 +1,87 @@
 "use client";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion, type PanInfo } from "motion/react";
-import { X, Repeat, Heart, Check } from "lucide-react";
 import { Task } from "@/app/types";
 import { priorityOptions } from "@/app/constants";
-import { recurrenceLabel, relativeDue, taskBucket } from "@/app/lib/tasks";
+import { recurrenceLabel } from "@/app/lib/tasks";
+import { Sheet } from "@/app/components/ui/Sheet";
+import { Button } from "@/app/components/ui/Button";
+import { Pill } from "@/app/components/ui/Pill";
+import { CheckIcon, EditIcon, TrashIcon, RepeatIcon, HeartIcon } from "@/app/components/ui/icons";
+import { CategoryBadge } from "./CategoryBadge";
+import { TaskDue } from "./TaskDue";
 
-const fmtRange = (iso: string | null) =>
+const fmt = (iso: string | null) =>
     iso
-        ? new Date(iso).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-        })
+        ? new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
         : null;
 
-const TONE_HEX: Record<string, string> = {
-    overdue: "#ef4444",
-    today: "#f59e0b",
-    completed: "#22c55e",
-    upcoming: "#7C6CFF",
-};
-
 interface Props {
+    /** Pass the live task from state (not a copy) so Mark done updates the sheet straight away. */
     task: Task | null;
     onClose: () => void;
     onEdit: (task: Task) => void;
     onDelete: (task: Task) => void;
+    onToggleDone: (task: Task) => void;
 }
 
-function Pill({ children }: { children: React.ReactNode }) {
+/** Task details in the shared Sheet. Mark done, Edit and Delete are always visible buttons, never hover-only. */
+export default function TaskDetailCard({ task, onClose, onEdit, onDelete, onToggleDone }: Props) {
+    const priority = task ? priorityOptions.find(o => o.value === task.priority) : undefined;
+    const repeat = task ? recurrenceLabel(task) : null;
+    const start = task ? fmt(task.startDateTime) : null;
+    const end = task ? fmt(task.endDateTime) : null;
+
     return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/80">
-            {children}
-        </span>
-    );
-}
-
-function useIsDesktop() {
-    const [isDesktop, setIsDesktop] = useState(false);
-    useEffect(() => {
-        const mq = window.matchMedia("(min-width: 1024px)");
-        const update = () => setIsDesktop(mq.matches);
-        update();
-        mq.addEventListener("change", update);
-        return () => mq.removeEventListener("change", update);
-    }, []);
-    return isDesktop;
-}
-
-export default function TaskDetailCard({ task, onClose, onEdit, onDelete }: Props) {
-    const [mounted, setMounted] = useState(false);
-    const isDesktop = useIsDesktop();
-
-    useEffect(() => {
-        const id = requestAnimationFrame(() => setMounted(true));
-        return () => cancelAnimationFrame(id);
-    }, []);
-
-    useEffect(() => {
-        if (!task) return;
-        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [task, onClose]);
-
-    if (!mounted) return null;
-
-    return createPortal(
-        <AnimatePresence>
-            {task && (
-                <DetailSheet key="task-detail-sheet" task={task} isDesktop={isDesktop} onClose={onClose} onEdit={onEdit} onDelete={onDelete} />
+        <Sheet
+            open={task !== null}
+            onClose={onClose}
+            title={task?.name ?? "Task"}
+            footer={task && (
+                <div className="flex flex-col gap-2">
+                    <Button variant={task.completed ? "secondary" : "primary"} size="lg" fullWidth onClick={() => onToggleDone(task)}>
+                        <CheckIcon aria-hidden="true" /> {task.completed ? "Undo done" : "Mark done"}
+                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Button onClick={() => onEdit(task)}><EditIcon aria-hidden="true" /> Edit</Button>
+                        <Button variant="danger" onClick={() => onDelete(task)}><TrashIcon aria-hidden="true" /> Delete</Button>
+                    </div>
+                </div>
             )}
-        </AnimatePresence>,
-        document.body,
-    );
-}
-
-function DetailSheet({ task, isDesktop, onClose }: { task: Task; isDesktop: boolean } & Omit<Props, "task">) {
-    const priority = priorityOptions.find(o => o.value === task.priority);
-    const priColor = priority?.hex ?? "#7C6CFF";
-    const recurrence = recurrenceLabel(task);
-    const tone = TONE_HEX[taskBucket(task)] ?? TONE_HEX.upcoming;
-    const start = fmtRange(task.startDateTime);
-    const end = fmtRange(task.endDateTime);
-
-    const slide = isDesktop
-        ? { initial: { x: "100%" }, animate: { x: 0 }, exit: { x: "100%" } }
-        : { initial: { y: "100%" }, animate: { y: 0 }, exit: { y: "100%" } };
-
-    // Drag-to-close. On mobile the sheet drags down; on desktop the side panel
-    // drags right. Past a distance/velocity threshold in the closing direction
-    // we close; otherwise motion springs it back to the open position.
-    const CLOSE_DISTANCE = 120;
-    const CLOSE_VELOCITY = 500;
-    const dragProps = isDesktop
-        ? {
-            drag: "x" as const,
-            dragConstraints: { left: 0 }, // can't drag past the open position
-            dragElastic: 0.15,
-            onDragEnd: (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-                if (info.offset.x > CLOSE_DISTANCE || info.velocity.x > CLOSE_VELOCITY) onClose();
-            },
-        }
-        : {
-            drag: "y" as const,
-            dragConstraints: { top: 0 }, // can't drag above the open position
-            dragElastic: 0.15,
-            onDragEnd: (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-                if (info.offset.y > CLOSE_DISTANCE || info.velocity.y > CLOSE_VELOCITY) onClose();
-            },
-        };
-
-    return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={onClose}
-            className="fixed inset-0 z-60 flex items-end justify-center bg-black/50 backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-transparent lg:backdrop-blur-none"
         >
-            <motion.div
-                role="dialog"
-                aria-label={`Details for ${task.name}`}
-                onClick={(e) => e.stopPropagation()}
-                initial={slide.initial}
-                animate={slide.animate}
-                exit={slide.exit}
-                transition={{ type: "spring", damping: 32, stiffness: 320 }}
-                {...dragProps}
-                className="w-full rounded-t-2xl border border-white/10 bg-[#0c0b1a]/95 backdrop-blur-xl p-5 pb-8 shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.7)]
-                    lg:h-full lg:max-w-122.5 lg:rounded-none lg:border-0 lg:border-l lg:bg-white/5 lg:backdrop-blur-none lg:p-6 lg:pb-6 lg:shadow-none lg:overflow-y-auto"
-            >
-                <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-white/25 lg:hidden" />
+            {task && (
+                <div className="flex flex-col gap-4">
+                    {task.completed
+                        ? <Pill tone="ok" className="self-start"><CheckIcon width={14} height={14} aria-hidden="true" /> Done</Pill>
+                        : <TaskDue task={task} />}
 
-                <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                        <h3 className={`text-lg font-semibold leading-snug text-white ${task.completed ? "line-through text-white/50" : ""}`}>
-                            {task.name}
-                        </h3>
-                        {(task.completed || task.favorite) && (
-                            <div className="mt-1 flex items-center gap-2">
-                                {task.completed && (
-                                    <span className="inline-flex items-center gap-1 text-xs text-green-400">
-                                        <Check size={12} strokeWidth={3} /> Done
-                                    </span>
-                                )}
-                                {task.favorite && (
-                                    <Heart size={13} className="fill-red-500 text-red-500" />
-                                )}
-                            </div>
+                    <div className="flex flex-wrap gap-2">
+                        {task.category && (
+                            <Pill>
+                                <CategoryBadge color={task.category.color} icon={task.category.icon} size="sm" />
+                                {task.category.name}
+                            </Pill>
                         )}
+                        {priority && (
+                            <Pill>
+                                <span aria-hidden="true" className="size-2.5 rounded-full" style={{ background: priority.color }} />
+                                {priority.label} priority
+                            </Pill>
+                        )}
+                        {repeat && <Pill><RepeatIcon width={14} height={14} aria-hidden="true" /> {repeat}</Pill>}
+                        {task.favorite && <Pill tone="accent"><HeartIcon width={14} height={14} aria-hidden="true" /> Favourite</Pill>}
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                        <button type="button" title="Close" onClick={onClose}
-                            className="p-1.5 rounded-md text-white/60 hover:text-white hover:bg-white/10 cursor-pointer">
-                            <X size={17} />
-                        </button>
-                    </div>
-                </div>
-
-                {task.description ? (
-                    <p className="mt-3 max-h-40 overflow-y-auto text-sm text-white/70 whitespace-pre-wrap wrap-break-word">{task.description}</p>
-                ) : null}
-
-                <div className="mt-4">
-                    <div className="text-sm font-medium" style={{ color: tone }}>
-                        {relativeDue(task)}
-                    </div>
-                    {!task.frequency && end ? (
-                        <div className="mt-2 flex gap-2.5 text-sm">
-                            <div className="flex flex-col items-center self-stretch py-1">
-                                <span className="h-2 w-2 shrink-0 rounded-full bg-white/40" />
-                                <span className="my-0.5 w-px flex-1"
-                                    style={{ background: `linear-gradient(to bottom, rgba(255,255,255,0.25), ${tone})` }} />
-                                <span className="h-2 w-2 shrink-0 rounded-full"
-                                    style={{ background: tone, boxShadow: `0 0 6px ${tone}` }} />
-                            </div>
-                            <div className="flex flex-col justify-between gap-1.5 py-0.5">
-                                <span className="text-white/70">{start}</span>
-                                <span style={{ color: tone }}>{end}</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="mt-2 flex items-center gap-2.5 text-sm">
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-white/40" />
-                            <span className="text-white/70">{start ?? "—"}</span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                    <Pill>
-                        <span style={{ color: priColor }}>{priority?.label ?? task.priority}</span>
-                    </Pill>
-
-                    {task.category && (
-                        <Pill>
-                            <span className="h-2.5 w-2.5 rounded-full"
-                                style={{ background: task.category.color, boxShadow: `0 0 6px ${task.category.color}` }} />
-                            {task.category.name}
-                        </Pill>
+                    {(start || end) && (
+                        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body">
+                            {start && (<><dt className="font-semibold text-ink">Starts</dt><dd className="text-ink-soft">{start}</dd></>)}
+                            {end && !repeat && (<><dt className="font-semibold text-ink">Ends</dt><dd className="text-ink-soft">{end}</dd></>)}
+                        </dl>
                     )}
 
-                    {recurrence && (
-                        <Pill>
-                            <Repeat size={12} className="text-white/50" />
-                            {recurrence}
-                        </Pill>
-                    )}
+                    {task.description
+                        ? <p className="whitespace-pre-wrap break-words text-body text-ink">{task.description}</p>
+                        : <p className="text-body text-ink-soft">No notes on this one.</p>}
                 </div>
-            </motion.div>
-        </motion.div>
+            )}
+        </Sheet>
     );
 }

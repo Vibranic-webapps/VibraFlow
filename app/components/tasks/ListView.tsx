@@ -1,14 +1,22 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import { Heart, Check, Trash, Pencil, Plus, Search, ArrowDownUp, Inbox, SearchX, TriangleAlert, X, ListFilter } from "lucide-react";
-import { DynamicIcon, type IconName } from "lucide-react/dynamic";
+import { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { Task, Category } from "@/app/types";
-import { priorityOptions } from "@/app/constants"
-import { taskBucket, taskStats, dueOf, priorityRank, dueLabel, groupByDay, groupByWeek, type DayGroup } from "@/app/lib/tasks";
+import { priorityOptions } from "@/app/constants";
+import { taskBucket, taskStats, dueOf, priorityRank, groupByDay, groupByWeek, type DayGroup } from "@/app/lib/tasks";
 import { useTaskActions } from "@/app/hooks/useTaskActions";
 import TaskDrawer, { type TaskDrawerHandle } from "../TaskDrawer";
 import TaskDetailCard from "./TaskDetailCard";
+import { CategoryBadge } from "./CategoryBadge";
+import { TaskDue } from "./TaskDue";
+import { Button } from "@/app/components/ui/Button";
+import { IconButton } from "@/app/components/ui/IconButton";
+import { Card } from "@/app/components/ui/Card";
+import { Pill, PillButton } from "@/app/components/ui/Pill";
+import { CONTROL } from "@/app/components/ui/Field";
+import { cx } from "@/app/components/ui/cx";
+import {
+    PlusIcon, SearchIcon, FilterIcon, SortIcon, CheckIcon, EditIcon, TrashIcon, HeartIcon, AlertIcon, BoardIcon,
+} from "@/app/components/ui/icons";
 
 interface ListViewProps {
     tasks: Task[];
@@ -16,28 +24,34 @@ interface ListViewProps {
     loading: boolean;
     categories: Category[];
     setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
-    onDrawerOpenChange?: (open: boolean) => void;
 }
 
-export default function ListView({ tasks, setTasks, loading, categories, setCategories, onDrawerOpenChange }: ListViewProps) {
+const LIST_COUNT_KEY = "orbit:listCount";
+const subscribeNoop = () => () => {};
+
+/**
+ * The saved row count from the last visit, so the loading skeleton matches. Read with useSyncExternalStore
+ * (null on the server) so it never causes a hydration mismatch or a set-state-in-effect.
+ */
+function useSavedListCount(): number {
+    const raw = useSyncExternalStore(
+        subscribeNoop,
+        () => localStorage.getItem(LIST_COUNT_KEY),
+        () => null,
+    );
+    const saved = Number(raw);
+    return Number.isFinite(saved) && saved > 0 ? Math.min(saved, 12) : 3;
+}
+
+const STATUS_FILTERS = [["all", "All"], ["active", "Active"], ["completed", "Done"], ["favorite", "Favourites"]] as const;
+
+export default function ListView({ tasks, setTasks, loading, categories, setCategories }: ListViewProps) {
     const drawer = useRef<TaskDrawerHandle>(null);
     const { updateTask } = useTaskActions(setTasks);
-    const [detailTask, setDetailTask] = useState<Task | null>(null);
-
+    // Keep only the id so the details sheet always shows the live task (Mark done updates it at once).
+    const [detailId, setDetailId] = useState<string | null>(null);
+    const detailTask = detailId ? tasks.find(t => t.id === detailId) ?? null : null;
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [editOpen, setEditOpen] = useState(false);
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => {
-        const id = requestAnimationFrame(() => setMounted(true));
-        return () => cancelAnimationFrame(id);
-    }, []);
-
-    // A right-side panel (edit drawer, or the detail sheet on desktop) pushes the
-    // page content aside. Derive the combined open state and report it up to the page.
-    const drawerOpen = editOpen || detailTask !== null;
-    useEffect(() => {
-        onDrawerOpenChange?.(drawerOpen);
-    }, [drawerOpen, onDrawerOpenChange]);
 
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed" | "favorite">("all");
@@ -45,26 +59,17 @@ export default function ListView({ tasks, setTasks, loading, categories, setCate
     const [catFilter, setCatFilter] = useState<string | null>(null);
     const [filtersOpen, setFiltersOpen] = useState(false);
 
-    // How many non-default filters are applied (search stays visible, so it's
-    // not counted here). Drives the badge on the Filters button.
+    // Non-default filters (search stays visible, so it is not counted). Drives the badge on the Filters button.
     const activeFilterCount = (statusFilter !== "all" ? 1 : 0) + (catFilter ? 1 : 0);
-
     const clearFilters = () => { setSearch(""); setStatusFilter("all"); setCatFilter(null); };
 
     const now = new Date();
     const visible = tasks.filter(t => t.startDateTime !== null);
     const stats = taskStats(visible, now);
 
-    // Remember how many rows were shown last time so the loading skeleton
-    // renders a matching count on the next visit (we can't know it during the
-    // very first fetch). Default to a small guess; cap so it never floods.
-    const [skeletonCount, setSkeletonCount] = useState(3);
+    const skeletonCount = useSavedListCount();
     useEffect(() => {
-        const saved = Number(localStorage.getItem("orbit:listCount"));
-        if (Number.isFinite(saved) && saved > 0) setSkeletonCount(Math.min(saved, 12));
-    }, []);
-    useEffect(() => {
-        if (!loading) localStorage.setItem("orbit:listCount", String(visible.length));
+        if (!loading) localStorage.setItem(LIST_COUNT_KEY, String(visible.length));
     }, [loading, visible.length]);
 
     const filtered = visible.filter(t => {
@@ -82,167 +87,105 @@ export default function ListView({ tasks, setTasks, loading, categories, setCate
         return (dueOf(a)?.getTime() ?? Infinity) - (dueOf(b)?.getTime() ?? Infinity);
     });
 
-    const toneHex = (tone: DayGroup["tone"]) =>
-        tone === "overdue" ? "#ef4444"
-            : tone === "today" ? "#f59e0b"
-                : tone === "completed" ? "#22c55e"
-                    : "#7C6CFF";
-
     const renderRow = (task: Task) => {
-        const priorityOption = priorityOptions.find(o => o.value === task.priority);
+        const priority = priorityOptions.find(o => o.value === task.priority);
         const bucket = taskBucket(task, now);
         const isEditing = editingId === task.id;
-        const dueColor =
-            bucket === "overdue" ? "text-red-400"
-                : bucket === "today" ? "text-amber-300"
-                    : "text-white/50";
-        const dot = priorityOption?.hex ?? "#7C6CFF";
-        const rank = priorityRank(task);
 
         return (
-            <div key={task.id} className={`group relative pl-11 @2xl:max-w-75 hover:z-20 ${detailTask?.id === task.id ? "z-30" : ""}`}>
-                {task.category ? (
-                    <button type="button" title={`Filter by ${task.category.name}`}
-                        onClick={() => setCatFilter(catFilter === task.category!.id ? null : task.category!.id)}
-                        className={`absolute left-0 top-2 z-10 grid place-items-center h-7 w-7 rounded-full cursor-pointer transition-transform hover:scale-110 ${catFilter === task.category.id ? "ring-2 ring-white/70" : ""}`}
-                        style={{
-                            background: `radial-gradient(circle at 35% 35%, color-mix(in srgb, ${task.category.color} 85%, white) 0%, ${task.category.color} 45%, color-mix(in srgb, ${task.category.color}, black 45%) 100%)`,
-                            boxShadow: `0 0 8px ${task.category.color}`,
-                        }}>
-                        {task.category.icon && (
-                            <DynamicIcon name={task.category.icon as IconName} size={14} strokeWidth={2.5}
-                                style={{
-                                    color: `color-mix(in srgb, ${task.category.color}, black 65%)`,
-                                    filter: "drop-shadow(0 0 1.5px rgba(255,255,255,0.7))",
-                                }} />
-                        )}
-                    </button>
-                ) : (
-                    <span aria-hidden className="absolute left-2.25 top-3.5 h-2.5 w-2.5 rounded-full bg-white/25" />
+            <Card
+                key={task.id}
+                as="article"
+                tone={task.completed ? "sunk" : bucket === "overdue" ? "raised" : "default"}
+                aria-label={task.name}
+                className={cx(
+                    "flex flex-col gap-3",
+                    bucket === "overdue" && !task.completed && "border-danger",
+                    isEditing && "ring-2 ring-accent ring-offset-2 ring-offset-paper",
                 )}
-
-                <div className={`relative isolate rounded-lg px-3 py-2 transition-shadow ${task.completed ? "opacity-50" : ""} ${isEditing ? "ring-2 ring-(--vibranic)/70 shadow-[0_0_18px_-6px_var(--vibranic)]" : ""}`}>
-                    <span aria-hidden
-                        className={`absolute inset-0 -z-10 rounded-lg transition-opacity ${isEditing ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-                        style={{
-                            background: task.category?.color
-                                ? `linear-gradient(135deg, ${task.category.color}33 0%, transparent 60%), rgba(255,255,255,0.04)`
-                                : "rgba(255,255,255,0.04)",
-                        }} />
-
-                    <div className="hidden lg:flex absolute left-full top-1/2 -translate-y-1/2 flex-col items-center gap-1 pl-1 opacity-0 pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
-                        <button type="button" title="Edit" className="p-1 rounded-md text-white/60 hover:bg-white/10 hover:text-white cursor-pointer" onClick={() => drawer.current?.openEdit(task)}>
-                            <Pencil size={15} />
+            >
+                <div className="flex min-w-0 items-start gap-3">
+                    {task.category
+                        ? <CategoryBadge color={task.category.color} icon={task.category.icon} className="mt-1.5" />
+                        : <span aria-hidden="true" className="line mt-1.5 size-8 shrink-0 rounded-full border-dashed border-ink-faint" />}
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <button
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={() => setDetailId(task.id)}
+                            className={cx(
+                                "focus-ring font-title min-h-11 w-full rounded-input text-left text-title leading-snug font-semibold wrap-break-word line-clamp-2",
+                                task.completed ? "text-ink-soft line-through decoration-2" : "text-ink",
+                            )}
+                        >
+                            {task.name}
                         </button>
-                        <button type="button" title="Delete" className="p-1 rounded-md text-white/60 hover:bg-red-500/15 hover:text-red-400 cursor-pointer" onClick={() => drawer.current?.requestDelete(task)}>
-                            <Trash size={15} />
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <button type="button" title={task.completed ? "Mark as not done" : "Mark as done"}
-                            onClick={() => updateTask(task, { completed: !task.completed })}
-                            className={`shrink-0 grid place-items-center h-5 w-5 rounded-full border-2 transition-colors cursor-pointer ${task.completed
-                                    ? "bg-green-500/80 border-green-500 text-white"
-                                    : "border-white/30 text-transparent hover:border-green-400 hover:text-green-400/60"
-                                }`}>
-                            <Check size={12} strokeWidth={3} />
-                        </button>
-
-                        <div className="relative min-w-0 flex-1">
-                            <button type="button" title="View details" onClick={() => setDetailTask(task)} className="absolute inset-0 z-0 rounded-md cursor-pointer" aria-label={`View details for ${task.name}`} />
-                            <h4 className={`font-medium text-white truncate ${task.completed ? "line-through text-white/50" : ""}`}>{task.name}</h4>
-                            <div className="flex items-center gap-2 text-xs mt-0.5">
-                                <span className={`pointer-events-none ${dueColor}`}>{dueLabel(task)}</span>
-                                {task.categoryRemoved && (
-                                    <span className="reletive z-10 flex items-center gap-1 rounded bg-amber-500/15 pl-1.5 pr-1 py-0.5 text-amber-300"
-                                        title="This task's category was deleted">
-                                        <TriangleAlert size={11} />
-                                        Category removed
-                                        <button type="button" title="Dismiss"
-                                            onClick={() => updateTask(task, { categoryRemoved: false })}
-                                            className="ml-0.5 rounded p-0.5 hover:bg-amber-500/25 cursor-pointer">
-                                            <X size={10} />
-                                        </button>
-                                    </span>
-                                )}
-                                {priorityOption && (
-                                    <span className="flex items-end gap-0.5 h-2" title={`${priorityOption.label} priority`}>
-                                        {Array.from({ length: 5 }).map((_, i) => {
-                                            const on = i <= rank;
-                                            return (
-                                                <span key={i} className="w-1 rounded-full"
-                                                    style={{
-                                                        height: 5 + i * 2,
-                                                        background: on ? dot : "rgba(255,255,255,0.15)",
-                                                        boxShadow: on ? `0 0 4px ${dot}` : undefined,
-                                                    }} />
-                                            );
-                                        })}
-                                    </span>
-                                )}
-                            </div>
+                        {task.completed
+                            ? <Pill tone="ok" className="self-start"><CheckIcon width={14} height={14} aria-hidden="true" /> Done</Pill>
+                            : <TaskDue task={task} />}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {task.category && <span className="sr-only">Category: {task.category.name}</span>}
+                            {priority && (
+                                <Pill>
+                                    <span aria-hidden="true" className="size-2.5 rounded-full" style={{ background: priority.color }} />
+                                    {priority.label}
+                                </Pill>
+                            )}
+                            {task.categoryRemoved && (
+                                <Pill tone="warn" className="pr-1">
+                                    <AlertIcon width={14} height={14} aria-hidden="true" /> Category removed
+                                </Pill>
+                            )}
                         </div>
-
-                        <div className="flex lg:hidden items-center gap-1 shrink-0">
-                            <button type="button" title="Edit" className="p-1 rounded-md text-white/60 hover:text-white cursor-pointer" onClick={() => drawer.current?.openEdit(task)}>
-                                <Pencil size={16} />
-                            </button>
-                            <button type="button" title="Delete" className="p-1 rounded-md text-white/60 hover:text-red-400 cursor-pointer" onClick={() => drawer.current?.requestDelete(task)}>
-                                <Trash size={16} />
-                            </button>
-                        </div>
-
-                        <button type="button" title="Favorite" className="shrink-0 p-1 rounded-md hover:bg-white/10 cursor-pointer" onClick={() => updateTask(task, { favorite: !task.favorite })}>
-                            <Heart className={task.favorite ? "fill-red-500 text-red-500" : "text-white/30"} size={18} />
-                        </button>
+                        {task.categoryRemoved && (
+                            <Button size="sm" variant="ghost" className="self-start -ml-2"
+                                onClick={() => updateTask(task, { categoryRemoved: false })}>
+                                Dismiss notice
+                            </Button>
+                        )}
                     </div>
-
                 </div>
-            </div>
+
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant={task.completed ? "secondary" : "primary"}
+                        size="sm"
+                        className="min-w-0 flex-1"
+                        onClick={() => updateTask(task, { completed: !task.completed })}
+                    >
+                        {task.completed ? "Undo done" : "Mark done"}
+                    </Button>
+                    <IconButton
+                        label={task.favorite ? `Remove ${task.name} from favourites` : `Favourite ${task.name}`}
+                        aria-pressed={task.favorite}
+                        icon={<HeartIcon fill={task.favorite ? "currentColor" : "none"} />}
+                        className={task.favorite ? "bg-accent-soft" : undefined}
+                        onClick={() => updateTask(task, { favorite: !task.favorite })}
+                    />
+                    <IconButton label={`Edit ${task.name}`} icon={<EditIcon />} onClick={() => drawer.current?.openEdit(task)} />
+                    <IconButton label={`Delete ${task.name}`} variant="danger" icon={<TrashIcon />}
+                        onClick={() => drawer.current?.requestDelete(task)} />
+                </div>
+            </Card>
         );
     };
 
-    const renderColumn = (group: DayGroup) => (
-        <div key={group.key} className="min-w-0 flex flex-col gap-3">
-            <div className="relative flex items-center gap-3 pl-11">
-                <span aria-hidden className="absolute left-1.75 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full"
-                    style={{ background: toneHex(group.tone), boxShadow: `0 0 10px ${toneHex(group.tone)}` }} />
-                <h3 className="text-xs uppercase tracking-[0.25em] text-white/50">
-                    {group.label}
-                    <span className="ml-2 text-white/25 tracking-normal">{group.items.length}</span>
-                </h3>
-            </div>
-            <div className="relative">
-                <div aria-hidden className="absolute left-3.5 top-1 bottom-1 w-px bg-linear-to-b from-transparent via-white/15 to-transparent" />
-                <div className="flex flex-col gap-1">
-                    {group.items.map(renderRow)}
-                </div>
-            </div>
+    const dayTone = (tone: DayGroup["tone"]) =>
+        tone === "overdue" ? "text-danger" : "text-ink";
+
+    const renderDay = (group: DayGroup) => (
+        <div key={group.key} className="flex min-w-0 flex-col gap-3">
+            <h3 className={cx("font-title flex items-center gap-2 text-lead font-semibold", dayTone(group.tone))}>
+                {group.tone === "overdue" && <AlertIcon width={18} height={18} aria-hidden="true" />}
+                {group.label}
+                <Pill className="font-body">{group.items.length}</Pill>
+            </h3>
+            {group.items.map(renderRow)}
         </div>
     );
 
     return (
-        <div className="@container p-4 flex flex-col gap-4 w-full max-w-360 mx-auto">
-            {mounted && createPortal(
-                <div className={`fixed z-30 right-4 bottom-6 lg:inset-x-0 lg:top-4 lg:bottom-auto pointer-events-none transition-opacity ${drawerOpen ? "opacity-0" : "opacity-100"}`}>
-                    <div className="lg:max-w-360 lg:mx-auto lg:px-4 flex justify-end">
-                        <button
-                            onClick={() => drawer.current?.openAdd()}
-                            className={`group pointer-events-auto flex items-center gap-2 p-3 rounded-full sm:px-4 sm:py-2 sm:rounded-lg border border-white/10 text-white backdrop-blur-md transition-all cursor-pointer
-                                bg-[color-mix(in_srgb,var(--vibranic)_15%,transparent)]
-                                hover:bg-[color-mix(in_srgb,var(--vibranic)_30%,transparent)] hover:border-(--vibranic)
-                                shadow-[0_0_16px_-4px_var(--vibranic)] hover:shadow-[0_0_24px_-2px_var(--vibranic)]
-                                ${drawerOpen ? "pointer-events-none" : ""}`}
-                        >
-                            <Plus size={18} className="transition-transform group-hover:rotate-90" />
-                            <span className="hidden sm:inline">Add task</span>
-                        </button>
-                    </div>
-                </div>,
-                document.body
-            )}
-
+        <div className="flex min-h-0 flex-1 flex-col">
             <TaskDrawer
                 ref={drawer}
                 tasks={tasks}
@@ -250,166 +193,122 @@ export default function ListView({ tasks, setTasks, loading, categories, setCate
                 categories={categories}
                 setCategories={setCategories}
                 onEditingChange={setEditingId}
-                onOpenChange={setEditOpen}
             />
 
             <TaskDetailCard
                 task={detailTask}
-                onClose={() => setDetailTask(null)}
-                onEdit={(t) => { setDetailTask(null); drawer.current?.openEdit(t); }}
-                onDelete={(t) => { setDetailTask(null); drawer.current?.requestDelete(t); }}
+                onClose={() => setDetailId(null)}
+                onToggleDone={(t) => updateTask(t, { completed: !t.completed })}
+                onEdit={(t) => { setDetailId(null); drawer.current?.openEdit(t); }}
+                onDelete={(t) => { setDetailId(null); drawer.current?.requestDelete(t); }}
             />
 
-            <div className="flex flex-col gap-8">
-                <p className="text-sm text-white/40">
-                    <span className="text-white/80">{stats.active}</span> active
-                    {stats.today > 0 && <> · <span className="text-amber-300">{stats.today}</span> due today</>}
-                    {stats.overdue > 0 && <> · <span className="text-red-400">{stats.overdue}</span> overdue</>}
-                    {stats.completed > 0 && <> · <span className="text-white/60">{stats.completed}</span> done</>}
-                </p>
-
-                <div className="flex flex-col gap-3">
-                    {/* Always-visible row: search · sort · filters toggle */}
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 flex-1 min-w-0 border-b border-white/10 focus-within:border-(--vibranic) transition-colors">
-                            <Search size={16} className="text-white/40 shrink-0" />
-                            <input type="text" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)}
-                                className="w-full bg-transparent py-1.5 text-base sm:text-sm text-white/90 placeholder:text-white/30 focus:outline-none" />
-                        </div>
-                        <button type="button" onClick={() => setSortBy(s => s === "date" ? "priority" : "date")}
-                            className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors cursor-pointer shrink-0">
-                            <ArrowDownUp size={14} /> <span className="hidden sm:inline">{sortBy === "date" ? "Date" : "Priority"}</span>
-                        </button>
-                        <button type="button" onClick={() => setFiltersOpen(o => !o)}
-                            aria-expanded={filtersOpen}
-                            className={`relative flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors cursor-pointer shrink-0 ${filtersOpen || activeFilterCount > 0 ? "border-(--vibranic)/50 text-white" : "border-white/10 text-white/50 hover:text-white"}`}>
-                            <ListFilter size={15} />
-                            <span className="hidden sm:inline">Filters</span>
-                            {activeFilterCount > 0 && (
-                                <span className="grid place-items-center h-4 min-w-4 px-1 rounded-full bg-(--vibranic) text-[10px] font-semibold text-black">
-                                    {activeFilterCount}
-                                </span>
-                            )}
-                        </button>
-                    </div>
-
-                    {/* Collapsible panel: status + categories, hidden by default */}
-                    {filtersOpen && (
-                        <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                            <div className="flex items-center gap-4 text-sm">
-                                {([["all", "All"], ["active", "Active"], ["completed", "Done"], ["favorite", "Favorites"]] as const).map(([val, label]) => (
-                                    <button key={val} type="button" onClick={() => setStatusFilter(val)}
-                                        className={`transition-colors cursor-pointer ${statusFilter === val ? "text-(--vibranic) drop-shadow-[0_0_8px_var(--vibranic)]" : "text-white/40 hover:text-white"}`}>
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {categories.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <button type="button" onClick={() => setCatFilter(null)}
-                                        className={`rounded-full border px-3 py-1 text-xs transition-colors cursor-pointer ${catFilter === null ? "border-white/30 bg-white/10 text-white" : "border-white/10 text-white/50 hover:text-white"
-                                            }`}>
-                                        All
-                                    </button>
-                                    {categories.map(c => (
-                                        <button key={c.id} type="button" onClick={() => setCatFilter(catFilter === c.id ? null : c.id)}
-                                            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors cursor-pointer ${catFilter === c.id ? "border-white/30 bg-white/10 text-white" : "border-white/10 text-white/50 hover:text-white"
-                                                }`}>
-                                            <span className="grid place-items-center h-4 w-4 rounded-full"
-                                                style={{
-                                                    background: `radial-gradient(circle at 35% 35%, color-mix(in srgb, ${c.color} 85%, white) 0%, ${c.color} 45%, color-mix(in srgb, ${c.color}, black 45%) 100%)`,
-                                                    boxShadow: `0 0 6px ${c.color}`,
-                                                }} />
-                                            {c.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            {activeFilterCount > 0 && (
-                                <button type="button" onClick={clearFilters}
-                                    className="self-start text-xs text-(--vibranic) hover:underline cursor-pointer">
-                                    Clear all filters
-                                </button>
-                            )}
-                        </div>
-                    )}
+            {/* search + tools stay put; only the list below scrolls */}
+            <div className="flex shrink-0 flex-col gap-2 px-4 pb-2">
+                <div className="relative">
+                    <SearchIcon aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-soft" />
+                    <input
+                        type="search"
+                        aria-label="Search tasks"
+                        placeholder="Search tasks"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className={cx(CONTROL, "h-12 pl-11")}
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <Button size="sm" onClick={() => setSortBy(s => s === "date" ? "priority" : "date")}>
+                        <SortIcon aria-hidden="true" /> Sort: {sortBy === "date" ? "Date" : "Priority"}
+                    </Button>
+                    <Button size="sm" aria-expanded={filtersOpen} variant={filtersOpen || activeFilterCount > 0 ? "primary" : "secondary"}
+                        onClick={() => setFiltersOpen(o => !o)}>
+                        <FilterIcon aria-hidden="true" /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                    </Button>
                 </div>
 
-                {loading ? (
-                    <div className="flex flex-col gap-1 w-full max-w-md" aria-hidden aria-busy="true">
-                        {Array.from({ length: skeletonCount }).map((_, i) => (
-                            <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-2">
-                                {/* checkbox */}
-                                <div className="shrink-0 h-5 w-5 rounded-full bg-white/10 animate-pulse"
-                                    style={{ animationDelay: `${i * 90}ms` }} />
-                                {/* title + meta */}
-                                <div className="min-w-0 flex-1 flex flex-col gap-2">
-                                    <div className="h-3.5 rounded bg-white/10 animate-pulse"
-                                        style={{ width: ["58%", "72%", "46%", "64%", "52%"][i % 5], animationDelay: `${i * 90}ms` }} />
-                                    <div className="h-2.5 w-24 rounded bg-white/5 animate-pulse"
-                                        style={{ animationDelay: `${i * 90 + 45}ms` }} />
-                                </div>
-                                {/* favorite */}
-                                <div className="shrink-0 h-4 w-4 rounded bg-white/10 animate-pulse"
-                                    style={{ animationDelay: `${i * 90}ms` }} />
+                {filtersOpen && (
+                    <Card tone="sunk" className="flex flex-col gap-3 p-3">
+                        <div className="flex flex-wrap gap-2" role="group" aria-label="Status">
+                            {STATUS_FILTERS.map(([val, label]) => (
+                                <PillButton key={val} selected={statusFilter === val} onClick={() => setStatusFilter(val)}>{label}</PillButton>
+                            ))}
+                        </div>
+                        {categories.length > 0 && (
+                            <div className="flex flex-wrap gap-2" role="group" aria-label="Category">
+                                <PillButton selected={catFilter === null} onClick={() => setCatFilter(null)}>Any category</PillButton>
+                                {categories.map(c => (
+                                    <PillButton key={c.id} selected={catFilter === c.id}
+                                        onClick={() => setCatFilter(catFilter === c.id ? null : c.id)}>
+                                        <CategoryBadge color={c.color} size="sm" /> {c.name}
+                                    </PillButton>
+                                ))}
                             </div>
+                        )}
+                        {(activeFilterCount > 0 || search) && (
+                            <Button size="sm" variant="ghost" className="self-start" onClick={clearFilters}>Clear all filters</Button>
+                        )}
+                    </Card>
+                )}
+            </div>
+
+            {/* the ONE scroll area of this screen */}
+            <div className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none px-4 pb-4">
+                {loading ? (
+                    <div className="flex flex-col gap-3" aria-hidden="true" aria-busy="true">
+                        {Array.from({ length: skeletonCount }).map((_, i) => (
+                            <Card key={i} tone="sunk" className="flex animate-pulse flex-col gap-3">
+                                <div className="flex gap-3">
+                                    <div className="size-8 shrink-0 rounded-full bg-surface-edge" />
+                                    <div className="flex flex-1 flex-col gap-2">
+                                        <div className="h-5 rounded-input bg-surface-edge" style={{ width: ["58%", "72%", "46%", "64%", "52%"][i % 5] }} />
+                                        <div className="h-4 w-28 rounded-input bg-surface-edge" />
+                                    </div>
+                                </div>
+                                <div className="h-11 rounded-btn bg-surface-edge" />
+                            </Card>
                         ))}
                     </div>
                 ) : sorted.length === 0 ? (
                     visible.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-                            <div className="grid place-items-center h-16 w-16 rounded-full border border-white/10 bg-white/5">
-                                <Inbox className="text-white/40" size={28} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-white/80">No tasks yet</h3>
-                                <p className="mt-1 text-sm text-white/40">Create my first task to get started.</p>
-                            </div>
-                            <button
-                                onClick={() => drawer.current?.openAdd()}
-                                className={`group pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-lg border border-white/10 text-white backdrop-blur-md transition-all cursor-pointer
-                                    bg-[color-mix(in_srgb,var(--vibranic)_15%,transparent)]
-                                    hover:bg-[color-mix(in_srgb,var(--vibranic)_30%,transparent)] hover:border-(--vibranic)
-                                    shadow-[0_0_16px_-4px_var(--vibranic)] hover:shadow-[0_0_24px_-2px_var(--vibranic)]
-                                    ${drawerOpen ? "pointer-events-none" : ""}`}
-                            >
-                                <Plus size={18} className="transition-transform group-hover:rotate-90" />
-                                Add my first task
-                            </button>
+                        <div className="flex flex-col items-center gap-3 py-12 text-center">
+                            <span className="line grid size-16 place-items-center rounded-full border-ink bg-surface text-ink"><BoardIcon width={30} height={30} /></span>
+                            <h2 className="font-title text-heading font-semibold text-ink">No tasks yet</h2>
+                            <p className="text-body text-ink-soft">Add your first one and it will show up here.</p>
+                            <Button variant="primary" size="lg" onClick={() => drawer.current?.openAdd()}>
+                                <PlusIcon aria-hidden="true" /> Add my first task
+                            </Button>
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-                            <SearchX className="text-white/30" size={28} />
-                            <div>
-                                <h3 className="text-base font-semibold text-white/70">No matching tasks</h3>
-                                <p className="mt-1 text-sm text-white/40">Try adjusting your search or filters.</p>
-                            </div>
-                            <button type="button" onClick={clearFilters}
-                                className="text-sm text-(--vibranic) hover:underline cursor-pointer">
-                                Clear filters
-                            </button>
+                        <div className="flex flex-col items-center gap-3 py-12 text-center">
+                            <span className="line grid size-16 place-items-center rounded-full border-ink bg-surface text-ink"><SearchIcon width={30} height={30} /></span>
+                            <h2 className="font-title text-heading font-semibold text-ink">Nothing matches</h2>
+                            <p className="text-body text-ink-soft">Try another word, or clear the filters.</p>
+                            <Button onClick={clearFilters}>Clear filters</Button>
                         </div>
                     )
                 ) : (
-                    <div className="flex flex-col gap-12">
+                    <div className="flex flex-col gap-6">
+                        <p className="text-body text-ink-soft">
+                            <strong className="font-semibold text-ink">{stats.active}</strong> to do
+                            {stats.today > 0 && <> · <strong className="font-semibold text-ink">{stats.today}</strong> today</>}
+                            {stats.overdue > 0 && <> · <strong className="font-semibold text-danger">{stats.overdue} overdue</strong></>}
+                            {stats.completed > 0 && <> · {stats.completed} done</>}
+                        </p>
                         {groupByWeek(groupByDay(sorted, now), now).map(section => (
-                            <section key={section.key} className="flex flex-col gap-5">
-                                <div className="flex items-center gap-4">
-                                    <div className="h-px flex-1 bg-linear-to-r from-transparent to-white/20" />
-                                    <span className="relative flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 backdrop-blur-sm">
-                                        <span className="text-xs font-semibold uppercase tracking-[0.25em] text-white/75">{section.label}</span>
-                                    </span>
-                                    <div className="h-px flex-1 bg-linear-to-l from-transparent to-white/20" />
-                                </div>
-                                <div className="grid gap-8 grid-cols-1 @2xl:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4">
-                                    {section.days.map(renderColumn)}
-                                </div>
+                            <section key={section.key} aria-label={section.label} className="flex flex-col gap-4">
+                                <h2 className="line-b font-title pb-1 text-caption font-semibold tracking-wide text-ink-soft uppercase">{section.label}</h2>
+                                {section.days.map(renderDay)}
                             </section>
                         ))}
                     </div>
                 )}
+            </div>
+
+            {/* one add button, docked inside the column: it can never sit on top of a row's actions */}
+            <div className="line-t shrink-0 bg-paper px-4 py-3">
+                <Button variant="primary" size="lg" fullWidth onClick={() => drawer.current?.openAdd()}>
+                    <PlusIcon aria-hidden="true" /> Add task
+                </Button>
             </div>
         </div>
     );

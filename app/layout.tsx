@@ -33,6 +33,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Toasts sit above the docked add bar + tab bar so they never cover the page title (about 9.5rem on a phone).
+const TOAST_BOTTOM = "calc(env(safe-area-inset-bottom) + 9.5rem)";
+
 export const metadata: Metadata = {
   title: "VibraFlow",
   description: "VibraFlow — a personal planner for tasks, calendar, and goals.",
@@ -64,9 +67,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-paper text-ink">
         {children}
         <Toaster
-          position="top-center"
-          offset="calc(env(safe-area-inset-top) + 12px)"
-          mobileOffset="calc(env(safe-area-inset-top) + 12px)"
+          position="bottom-center"
+          offset={{ bottom: TOAST_BOTTOM, left: 16, right: 16 }}
+          mobileOffset={{ bottom: TOAST_BOTTOM, left: 16, right: 16 }}
           toastOptions={{
             unstyled: true,
             classNames: {
