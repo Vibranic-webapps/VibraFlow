@@ -1,6 +1,7 @@
 import { Task } from "@/app/types";
 import { priorityOptions } from "@/app/constants";
 import { startOfDay, addDays } from "@/app/lib/calendar";
+import { dateOnlyToLocalDate } from "@/lib/datetime";
 
 export type Bucket = "overdue" | "today" | "upcoming" | "completed";
 export type ItemKind = "task" | "event";
@@ -91,7 +92,7 @@ export function occursOn(task: Task, day: Date): boolean {
     const start = startOfDay(new Date(task.startDateTime));
 
     if (day < start) return false;
-    if (task.recurrenceEnd && day > startOfDay(new Date(task.recurrenceEnd))) return false;
+    if (task.recurrenceEnd && day > dateOnlyToLocalDate(task.recurrenceEnd)) return false;
 
     if (!task.frequency) {
         return day <= startOfDay(new Date(task.endDateTime));
@@ -334,7 +335,7 @@ export function recurrenceLabel(t: Task): string | null {
         label += ` on ${days}`;
     }
     if (t.recurrenceEnd) {
-        const end = new Date(t.recurrenceEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        const end = dateOnlyToLocalDate(t.recurrenceEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         label += ` · until ${end}`;
     }
     return label;

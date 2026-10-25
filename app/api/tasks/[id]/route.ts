@@ -2,6 +2,7 @@ import { readSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse, after } from "next/server";
 import { reportEvent } from "@/lib/vibradex";
+import { readInstantField, readDateOnlyField } from "@/lib/datetime";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }
 ) {
@@ -20,13 +21,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         stateId, order } = body;
 
 
+        // Date-times must be unambiguous ISO instants: never parsed in the server's timezone.
+        // Blank/absent start or end = leave unchanged (as before).
+        const start = readInstantField(startDateTime, "startDateTime");
+        if (!start.ok) return NextResponse.json({ error: start.error, field: "startDateTime" }, { status: 400 });
+        const end = readInstantField(endDateTime, "endDateTime");
+        if (!end.ok) return NextResponse.json({ error: end.error, field: "endDateTime" }, { status: 400 });
+        // recurrenceEnd: absent = unchanged, null/"" = clear, otherwise a YYYY-MM-DD calendar date.
+        const until = readDateOnlyField(recurrenceEnd, "recurrenceEnd");
+        if (!until.ok) return NextResponse.json({ error: until.error, field: "recurrenceEnd" }, { status: 400 });
+
         const updatedTask = await prisma.task.update({
             where: { id: id },
             data: {
                 name,
                 description,
-                startDateTime: startDateTime ? new Date(startDateTime) : undefined,
-                endDateTime: endDateTime ? new Date(endDateTime) : undefined,
+                startDateTime: start.value ?? undefined,
+                endDateTime: end.value ?? undefined,
                 priority,
                 categoryId: categoryId || undefined,
                 favorite,
@@ -34,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
                 frequency,
                 interval,
                 byWeekday,
-                recurrenceEnd: recurrenceEnd ? new Date(recurrenceEnd) : recurrenceEnd,
+                recurrenceEnd: recurrenceEnd === undefined ? undefined : until.value,
                 categoryRemoved: categoryId ? false : categoryRemoved,
                 stateId: stateId === undefined ? undefined : stateId,
                 order: typeof order === "number" ? order : undefined,
