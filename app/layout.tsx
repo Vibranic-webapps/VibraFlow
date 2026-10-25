@@ -1,16 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Inter, Geist_Mono, Fredoka, Caveat_Brush } from "next/font/google";
+import { Inter, Geist_Mono, Fredoka, Caveat_Brush } from "next/font/google";
 import { Toaster } from "sonner";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
 const inter = Inter({
   variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
   subsets: ["latin"],
 });
 
@@ -61,7 +56,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} ${fredoka.variable} ${caveatBrush.variable} ${geistMono.variable} h-full bg-paper antialiased`}
+      className={`${inter.variable} ${fredoka.variable} ${caveatBrush.variable} ${geistMono.variable} h-full bg-paper antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-paper text-ink">
