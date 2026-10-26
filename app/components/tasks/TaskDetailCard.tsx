@@ -56,7 +56,7 @@ export default function TaskDetailCard({ task, onClose, onEdit, onDelete, onTogg
                     <div className="flex flex-wrap gap-2">
                         {task.category && (
                             <Pill>
-                                <CategoryBadge color={task.category.color} icon={task.category.icon} size="sm" />
+                                <CategoryBadge color={task.category.color} icon={task.category.icon} size="xs" />
                                 {task.category.name}
                             </Pill>
                         )}

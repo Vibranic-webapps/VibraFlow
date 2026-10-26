@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Task } from "@/app/types";
 import { occursOn, isMultiDay, minutesIntoDay, startTimeLabel } from "@/app/lib/tasks";
 import { isSameDay, toDateTimeValue } from "@/app/lib/calendar";
@@ -7,6 +7,11 @@ import { isSameDay, toDateTimeValue } from "@/app/lib/calendar";
 const HOUR_PX = 48;
 const MIN_EVENT_PX = 44; // keeps every event a comfortable touch target
 const SNAP = 15;
+
+// Touch: a finger landing on a task is usually the start of a scroll through the day. A task is only
+// picked up after it has been held still this long; moving more than PRESS_SLOP_PX first = a scroll.
+const LONG_PRESS_MS = 400;
+const PRESS_SLOP_PX = 8;
 
 // Dynamic hour window: render only the hours around the day's tasks so the grid
 // fits the screen instead of forcing a full 24h scroll.
@@ -143,16 +148,10 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
         });
     };
 
-    const beginDrag = (e: React.PointerEvent, task: Task, edge: DragEdge, origStart: number, origEnd: number) => {
-        e.stopPropagation();
-        e.preventDefault();
-        // Capture the pointer so touch drags keep delivering move/up events even
-        // once the finger leaves the tiny handle — without this the browser can
-        // hijack the gesture as a scroll and the drag dies on mobile.
-        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { }
+    const startDrag = (startY: number, task: Task, edge: DragEdge, origStart: number, origEnd: number) => {
         const originDayIndex = days.findIndex(day => isSameDay(day, new Date(task.startDateTime!)));
         dragRef.current = {
-            task, edge, startY: e.clientY, origStart, origEnd, originDayIndex, moved: false,
+            task, edge, startY, origStart, origEnd, originDayIndex, moved: false,
             curStart: origStart, curEnd: origEnd, curDay: originDayIndex,
         };
         setDraft({ id: task.id, startMin: origStart, endMin: origEnd, dayIndex: originDayIndex });
@@ -160,6 +159,71 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
         window.addEventListener("pointermove", moveDrag);
         window.addEventListener("pointerup", endDrag);
         window.addEventListener("pointercancel", endDrag);
+    };
+
+    // A touch press that is waiting to become a drag (see LONG_PRESS_MS).
+    const pendingRef = useRef<{ timer: number; cleanup: () => void } | null>(null);
+    const cancelPending = () => {
+        const p = pendingRef.current;
+        if (!p) return;
+        pendingRef.current = null;
+        window.clearTimeout(p.timer);
+        p.cleanup();
+    };
+
+    // While a task is being dragged by touch, stop the finger from also scrolling the day.
+    // Must be a non-passive listener: React's onTouchMove is passive and cannot preventDefault.
+    useEffect(() => {
+        const blockScroll = (e: TouchEvent) => { if (dragRef.current) e.preventDefault(); };
+        window.addEventListener("touchmove", blockScroll, { passive: false });
+        return () => {
+            window.removeEventListener("touchmove", blockScroll);
+            const p = pendingRef.current;
+            if (p) { window.clearTimeout(p.timer); p.cleanup(); }
+        };
+    }, []);
+
+    const onEventPointerDown = (e: React.PointerEvent, task: Task, edge: DragEdge, origStart: number, origEnd: number) => {
+        e.stopPropagation();
+        const el = e.currentTarget as HTMLElement;
+        const { pointerId, clientX: x, clientY: y } = e;
+
+        // Mouse / pen: grab straight away, as before.
+        if (e.pointerType !== "touch") {
+            e.preventDefault();
+            // Capture so move/up keep arriving once the pointer leaves the small handle.
+            try { el.setPointerCapture(pointerId); } catch { }
+            startDrag(y, task, edge, origStart, origEnd);
+            return;
+        }
+
+        // Touch: let the browser scroll unless the finger is held still for LONG_PRESS_MS.
+        cancelPending();
+        const onMove = (ev: PointerEvent) => {
+            if (ev.pointerId === pointerId && Math.hypot(ev.clientX - x, ev.clientY - y) > PRESS_SLOP_PX) cancelPending();
+        };
+        const onUp = (ev: PointerEvent) => {
+            if (ev.pointerId !== pointerId) return;
+            cancelPending();
+            onEditTask(task); // a quick tap opens the task
+        };
+        const onCancel = (ev: PointerEvent) => { if (ev.pointerId === pointerId) cancelPending(); };
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onCancel);
+        const timer = window.setTimeout(() => {
+            cancelPending();
+            try { el.setPointerCapture(pointerId); } catch { }
+            startDrag(y, task, edge, origStart, origEnd);
+        }, LONG_PRESS_MS);
+        pendingRef.current = {
+            timer,
+            cleanup: () => {
+                window.removeEventListener("pointermove", onMove);
+                window.removeEventListener("pointerup", onUp);
+                window.removeEventListener("pointercancel", onCancel);
+            },
+        };
     };
 
     return (
@@ -268,28 +332,30 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
                                     const height = Math.max(MIN_EVENT_PX, ((vis1 - vis0) / 60) * HOUR_PX);
                                     const color = t.category?.color ?? "var(--accent)";
                                     // Resize handles are thin drag strips; the body of the event is the big tap target.
-                                    const handle = "absolute inset-x-0 h-2 cursor-ns-resize touch-none z-10";
+                                    const handle = "absolute inset-x-0 h-2 cursor-ns-resize touch-pan-y z-10";
 
                                     return (
                                         <div key={t.id}
                                             style={{ top, height, background: `color-mix(in srgb, ${color} 28%, var(--surface))`, borderLeft: `4px solid ${color}` }}
-                                            className={`absolute right-0.5 left-0.5 overflow-hidden rounded-input ${live ? "ring-2 ring-accent" : ""}`}>
+                                            // select-none + no callout: a long press picks the task up instead of selecting text / opening the iOS menu
+                                            onContextMenu={(e) => e.preventDefault()}
+                                            className={`absolute right-0.5 left-0.5 overflow-hidden rounded-input select-none [-webkit-touch-callout:none] ${live ? "z-20 ring-2 ring-accent shadow-lift" : ""}`}>
                                             <div className={`${handle} top-0`}
-                                                onPointerDown={(e) => beginDrag(e, t, "top", baseStart, baseEnd)} />
+                                                onPointerDown={(e) => onEventPointerDown(e, t, "top", baseStart, baseEnd)} />
 
                                             <div
                                                 role="button"
                                                 tabIndex={0}
                                                 aria-label={`${t.name}, ${startTimeLabel(t)}`}
                                                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEditTask(t); } }}
-                                                onPointerDown={(e) => beginDrag(e, t, "move", baseStart, baseEnd)}
-                                                className={`focus-ring h-full w-full cursor-grab touch-none px-1 py-0.5 text-left text-caption active:cursor-grabbing ${t.completed ? "text-ink-soft line-through" : "text-ink"}`}>
+                                                onPointerDown={(e) => onEventPointerDown(e, t, "move", baseStart, baseEnd)}
+                                                className={`focus-ring h-full w-full cursor-grab touch-pan-y px-1 py-0.5 text-left text-caption active:cursor-grabbing ${t.completed ? "text-ink-soft line-through" : "text-ink"}`}>
                                                 <span className="block truncate font-semibold">{t.name}</span>
                                                 <span className="block truncate text-ink-soft tabular-nums">{startTimeLabel(t)}</span>
                                             </div>
 
                                             <div className={`${handle} bottom-0`}
-                                                onPointerDown={(e) => beginDrag(e, t, "bottom", baseStart, baseEnd)} />
+                                                onPointerDown={(e) => onEventPointerDown(e, t, "bottom", baseStart, baseEnd)} />
                                         </div>
                                     );
                                 })}

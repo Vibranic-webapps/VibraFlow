@@ -36,22 +36,29 @@ export interface TabBarProps {
 }
 
 /**
+ * Tab bottom padding: the iPhone home-bar safe area minus 1.25rem (20px), so the bar sits low like a
+ * native tab bar while the labels still clear the home indicator. 0 on screens without a home bar.
+ */
+const SAFE_BOTTOM = "box-content pb-[max(0px,calc(env(safe-area-inset-bottom)-1.25rem))]";
+
+/**
  * Bottom tab bar. Presentational: it does not know about routing.
  * Place it at the bottom of the phone column (sticky/fixed is the shell's job).
- * Bottom padding = the iPhone home-bar safe area, so the labels never sit under the home indicator.
+ * Bottom padding = SAFE_BOTTOM, on each tab (not the nav) so the active highlight runs to the screen edge.
  */
 export function TabBar({ active, items = COZY_TABS, linkAs, onSelect, label = "Main", className }: TabBarProps) {
     const Link: ElementType = linkAs ?? "a";
     return (
         <nav
             aria-label={label}
-            className={cx("line-t bg-grain border-ink bg-surface pb-[env(safe-area-inset-bottom)]", className)}
+            className={cx("line-t bg-grain border-ink bg-surface", className)}
         >
             <ul className="flex">
                 {items.map((item) => {
                     const isActive = item.id === active;
                     const itemClass = cx(
                         "press focus-ring relative flex min-h-15 w-full flex-col items-center justify-center gap-0.5 text-caption font-semibold",
+                        SAFE_BOTTOM,
                         "focus-visible:-outline-offset-4",
                         isActive ? "bg-accent-soft text-ink" : "text-ink-soft",
                     );
