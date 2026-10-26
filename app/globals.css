@@ -11,8 +11,14 @@ html, body {
   overscroll-behavior: none;
 }
 
+/* --paper-grain, not --paper: iOS 26 paints the status-bar strip flat from this background, so it must
+   match the grainy page. This rule is unlayered, so it beats Tailwind's bg-* classes on <html>/<body>:
+   change the colour HERE, not in layout.tsx. */
+html, body {
+  background: var(--paper-grain);
+}
+
 body {
-  background: var(--paper);   /* paper, so there is no dark flash behind the app */
   color: var(--ink);
 }
 
