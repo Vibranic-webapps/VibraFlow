@@ -13,6 +13,11 @@ const SNAP = 15;
 const LONG_PRESS_MS = 400;
 const PRESS_SLOP_PX = 8;
 
+// Dragging a task within this many px of the top/bottom of the visible day scrolls the day,
+// up to this speed (reached at the very edge; slower further in).
+const AUTOSCROLL_EDGE_PX = 56;
+const AUTOSCROLL_MAX_PX_PER_MS = 0.5;
+
 // The grid always shows the full day (00:00–24:00) so you can scroll anywhere. On opening a day it
 // scrolls itself to the first task (minus a little headroom), else to now (today), else to a morning hour.
 // (It used to render only the hours around the tasks: that hid early/late hours and, on quiet days,
@@ -49,6 +54,8 @@ interface DragState {
     moved: boolean;
     // Live values, kept on the ref so the drag survives the event relocating between columns.
     curStart: number; curEnd: number; curDay: number;
+    // Scroll position at the grab, and the last pointer position (for edge auto-scroll).
+    startScrollTop: number; lastX: number; lastY: number;
 }
 
 export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, onCreateAt }: TimeGridViewProps) {
@@ -73,6 +80,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
     // Auto-scroll when the shown days change, and once more when tasks first appear for them
     // (they load after the grid). Never on other task edits, so a drag or save does not yank the view.
     const scrollerRef = useRef<HTMLDivElement>(null);
+    const headerRef = useRef<HTMLDivElement>(null);
     const autoScrollKeyRef = useRef("");
     const daysKey = days.map(d => d.toDateString()).join("|");
     useEffect(() => {
@@ -106,10 +114,14 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
     const allDayForDay = (day: Date) =>
         tasks.filter(t => occursOn(t, day) && isMultiDay(t));
 
-    const moveDrag = (e: PointerEvent) => {
+    // Recompute the draft from the last pointer position. Called on pointer moves and on every
+    // auto-scroll frame (the finger can stay still while the day scrolls underneath it).
+    const applyDrag = () => {
         const d = dragRef.current;
         if (!d) return;
-        const deltaMin = Math.round(((e.clientY - d.startY) / HOUR_PX) * 60 / SNAP) * SNAP;
+        // Pointer travel + how far the day scrolled since the grab = travel through the grid.
+        const scrolled = (scrollerRef.current?.scrollTop ?? d.startScrollTop) - d.startScrollTop;
+        const deltaMin = Math.round(((d.lastY - d.startY + scrolled) / HOUR_PX) * 60 / SNAP) * SNAP;
         if (deltaMin !== 0) d.moved = true;
         let startMin = d.origStart;
         let endMin = d.origEnd;
@@ -128,7 +140,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
             const grid = gridRef.current;
             if (grid) {
                 const r = grid.getBoundingClientRect();
-                const col = Math.floor(((e.clientX - r.left) / r.width) * days.length);
+                const col = Math.floor(((d.lastX - r.left) / r.width) * days.length);
                 dayIndex = Math.max(0, Math.min(col, days.length - 1));
             }
             if (dayIndex !== d.originDayIndex) d.moved = true;
@@ -137,9 +149,59 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
         setDraft({ id: d.task.id, startMin, endMin, dayIndex });
     };
 
+    // Edge auto-scroll: while a dragged task is held near the top or bottom of the visible day,
+    // scroll the day that way (faster the closer to the edge), so a task can go to any hour.
+    const autoScrollRef = useRef<{ frame: number; last: number } | null>(null);
+    const stopAutoScroll = () => {
+        if (autoScrollRef.current) cancelAnimationFrame(autoScrollRef.current.frame);
+        autoScrollRef.current = null;
+    };
+    const autoScrollTick = (now: number) => {
+        const d = dragRef.current;
+        const scroller = scrollerRef.current;
+        const state = autoScrollRef.current;
+        if (!d || !scroller || !state) { stopAutoScroll(); return; }
+        // cap: a dropped frame must not jump the view
+        const dt = state.last < 0 ? 16 : Math.min(48, now - state.last);
+        state.last = now;
+        const r = scroller.getBoundingClientRect();
+        // The sticky day header covers the top of the scroller: the visible grid starts below it.
+        const top = (headerRef.current?.getBoundingClientRect().bottom ?? r.top);
+        const bottom = r.bottom;
+        // Only once the finger has travelled toward that edge: grabbing a task that already sits
+        // near an edge must not set the day scrolling by itself.
+        const travel = d.lastY - d.startY;
+        let dir = 0;
+        let depth = 0;
+        if (travel < -PRESS_SLOP_PX && d.lastY < top + AUTOSCROLL_EDGE_PX) { dir = -1; depth = top + AUTOSCROLL_EDGE_PX - d.lastY; }
+        else if (travel > PRESS_SLOP_PX && d.lastY > bottom - AUTOSCROLL_EDGE_PX) { dir = 1; depth = d.lastY - (bottom - AUTOSCROLL_EDGE_PX); }
+        if (dir !== 0) {
+            const speed = AUTOSCROLL_MAX_PX_PER_MS * Math.min(1, depth / AUTOSCROLL_EDGE_PX);
+            const step = Math.max(1, Math.round(speed * dt)); // whole px: Safari rounds scrollTop
+            const before = scroller.scrollTop;
+            scroller.scrollTop = before + dir * step;
+            if (scroller.scrollTop !== before) applyDrag();
+        }
+        state.frame = requestAnimationFrame(autoScrollTick);
+    };
+    const startAutoScroll = () => {
+        if (autoScrollRef.current) return;
+        autoScrollRef.current = { frame: 0, last: -1 }; // -1: the first frame sets the clock
+        autoScrollRef.current.frame = requestAnimationFrame(autoScrollTick);
+    };
+
+    const moveDrag = (e: PointerEvent) => {
+        const d = dragRef.current;
+        if (!d) return;
+        d.lastX = e.clientX;
+        d.lastY = e.clientY;
+        applyDrag();
+    };
+
     const endDrag = () => {
         const d = dragRef.current;
         dragRef.current = null;
+        stopAutoScroll();
         setDraft(null);
         window.removeEventListener("pointermove", moveDrag);
         window.removeEventListener("pointerup", endDrag);
@@ -161,13 +223,15 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
         });
     };
 
-    const startDrag = (startY: number, task: Task, edge: DragEdge, origStart: number, origEnd: number) => {
+    const startDrag = (startX: number, startY: number, task: Task, edge: DragEdge, origStart: number, origEnd: number) => {
         const originDayIndex = days.findIndex(day => isSameDay(day, new Date(task.startDateTime!)));
         dragRef.current = {
             task, edge, startY, origStart, origEnd, originDayIndex, moved: false,
             curStart: origStart, curEnd: origEnd, curDay: originDayIndex,
+            startScrollTop: scrollerRef.current?.scrollTop ?? 0, lastX: startX, lastY: startY,
         };
         setDraft({ id: task.id, startMin: origStart, endMin: origEnd, dayIndex: originDayIndex });
+        startAutoScroll();
         // Track on window so the drag continues even as the event relocates between columns.
         window.addEventListener("pointermove", moveDrag);
         window.addEventListener("pointerup", endDrag);
@@ -191,6 +255,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
         window.addEventListener("touchmove", blockScroll, { passive: false });
         return () => {
             window.removeEventListener("touchmove", blockScroll);
+            if (autoScrollRef.current) cancelAnimationFrame(autoScrollRef.current.frame);
             const p = pendingRef.current;
             if (p) { window.clearTimeout(p.timer); p.cleanup(); }
         };
@@ -206,7 +271,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
             e.preventDefault();
             // Capture so move/up keep arriving once the pointer leaves the small handle.
             try { el.setPointerCapture(pointerId); } catch { }
-            startDrag(y, task, edge, origStart, origEnd);
+            startDrag(x, y, task, edge, origStart, origEnd);
             return;
         }
 
@@ -227,7 +292,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
         const timer = window.setTimeout(() => {
             cancelPending();
             try { el.setPointerCapture(pointerId); } catch { }
-            startDrag(y, task, edge, origStart, origEnd);
+            startDrag(x, y, task, edge, origStart, origEnd);
         }, LONG_PRESS_MS);
         pendingRef.current = {
             timer,
@@ -243,7 +308,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
         // The parent gives this a bounded height; this is the ONE vertical scroller of the view.
         <div className="line flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-surface">
             <div ref={scrollerRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none">
-                <div className="sticky top-0 z-30 bg-surface">
+                <div ref={headerRef} className="sticky top-0 z-30 bg-surface">
                     <div className="line-b flex">
                         <div className="w-12 shrink-0" />
                         <div className="grid min-w-0 flex-1" style={{ gridTemplateColumns: cols }}>
