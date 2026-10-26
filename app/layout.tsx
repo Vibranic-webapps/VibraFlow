@@ -45,7 +45,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: BRAND.paper,
+  // Status-bar strip: matches the grainy page so there is no seam under the clock.
+  themeColor: BRAND.paperGrain,
 };
 
 export default function RootLayout({
