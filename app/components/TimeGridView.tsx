@@ -13,12 +13,14 @@ const SNAP = 15;
 const LONG_PRESS_MS = 400;
 const PRESS_SLOP_PX = 8;
 
-// Dynamic hour window: render only the hours around the day's tasks so the grid
-// fits the screen instead of forcing a full 24h scroll.
-const DEFAULT_START_HOUR = 6;
-const DEFAULT_END_HOUR = 22;
-const WINDOW_PAD_HOURS = 1;
-const MIN_WINDOW_HOURS = 6;
+// The grid always shows the full day (00:00–24:00) so you can scroll anywhere. On opening a day it
+// scrolls itself to the first task (minus a little headroom), else to now (today), else to a morning hour.
+// (It used to render only the hours around the tasks: that hid early/late hours and, on quiet days,
+// made the grid so short that it could not scroll at all.)
+const START_HOUR = 0;
+const END_HOUR = 24;
+const SCROLL_HEADROOM_MIN = 60;
+const DEFAULT_SCROLL_HOUR = 7;
 
 interface TimeGridViewProps {
     days: Date[];
@@ -53,27 +55,38 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
     const now = new Date();
     const cols = `repeat(${days.length}, minmax(0, 1fr))`; // always fits the width: no sideways scroll
 
-    // Derive the visible hour window from the tasks currently on screen.
-    const [startHour, endHour] = useMemo(() => {
-        let min = Infinity, max = -Infinity;
+    const startHour = START_HOUR;
+    const endHour = END_HOUR;
+
+    // Earliest timed task start (minutes into the day) among the days on screen, or null.
+    const firstTaskMin = useMemo(() => {
+        let min = Infinity;
         for (const day of days) {
             for (const t of tasks) {
                 if (!t.startDateTime || isMultiDay(t) || !occursOn(t, day)) continue;
-                const s = new Date(t.startDateTime);
-                const e = t.endDateTime ? new Date(t.endDateTime) : s;
-                min = Math.min(min, minutesIntoDay(s));
-                max = Math.max(max, isSameDay(e, s) ? minutesIntoDay(e) : 24 * 60);
+                min = Math.min(min, minutesIntoDay(new Date(t.startDateTime)));
             }
         }
-        if (!isFinite(min)) return [DEFAULT_START_HOUR, DEFAULT_END_HOUR];
-        let startH = Math.max(0, Math.floor(min / 60) - WINDOW_PAD_HOURS);
-        let endH = Math.min(24, Math.ceil(max / 60) + WINDOW_PAD_HOURS);
-        if (endH - startH < MIN_WINDOW_HOURS) {
-            endH = Math.min(24, startH + MIN_WINDOW_HOURS);
-            startH = Math.max(0, endH - MIN_WINDOW_HOURS);
-        }
-        return [startH, endH];
+        return isFinite(min) ? min : null;
     }, [days, tasks]);
+
+    // Auto-scroll when the shown days change, and once more when tasks first appear for them
+    // (they load after the grid). Never on other task edits, so a drag or save does not yank the view.
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const autoScrollKeyRef = useRef("");
+    const daysKey = days.map(d => d.toDateString()).join("|");
+    useEffect(() => {
+        const scroller = scrollerRef.current;
+        if (!scroller) return;
+        const key = `${daysKey}|${firstTaskMin !== null}`;
+        if (autoScrollKeyRef.current === key) return;
+        autoScrollKeyRef.current = key;
+        const today = new Date();
+        const showsToday = days.some(d => isSameDay(d, today));
+        const targetMin = firstTaskMin ?? (showsToday ? minutesIntoDay(today) : DEFAULT_SCROLL_HOUR * 60);
+        // The sticky day header sits on top of the scroller, so scrollTop = y lands that time just under it.
+        scroller.scrollTop = Math.max(0, ((targetMin - SCROLL_HEADROOM_MIN - startHour * 60) / 60) * HOUR_PX);
+    }, [daysKey, firstTaskMin, days, startHour]);
 
     const visibleHours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
     const winStartMin = startHour * 60;
@@ -229,7 +242,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
     return (
         // The parent gives this a bounded height; this is the ONE vertical scroller of the view.
         <div className="line flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-surface">
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none">
+            <div ref={scrollerRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none">
                 <div className="sticky top-0 z-30 bg-surface">
                     <div className="line-b flex">
                         <div className="w-12 shrink-0" />
