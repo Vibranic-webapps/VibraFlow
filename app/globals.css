@@ -25,6 +25,8 @@ body {
 :root {
   /* paper + surfaces */
   --paper:         #F1E6CC;   /* page parchment */
+  --paper-grain:   #E4D8BD;   /* --paper + --grain as the eye sees it (flat). html/body bg: iOS 26 paints the
+                                 status-bar strip from it. Keep in sync with BRAND.paperGrain (lib/brand.ts). */
   --backdrop:      #E9DFC4;   /* desktop backdrop around the phone column */
   --surface:       #F8F0DB;   /* card */
   --surface-raised:#FFF8E4;   /* inputs, pressed / highlighted card */
@@ -111,6 +113,7 @@ body {
 @theme inline {
   /* colours -> bg-surface, text-ink, border-ink, ... */
   --color-paper: var(--paper);
+  --color-paper-grain: var(--paper-grain);
   --color-backdrop: var(--backdrop);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);

@@ -55,12 +55,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // bg-paper-grain (not bg-paper): iOS 26 ignores theme-color and paints the status-bar strip
+    // flat from the html/body background, so it must match the grainy page, not the bare parchment.
     <html
       lang="en"
-      className={`${inter.variable} ${fredoka.variable} ${caveatBrush.variable} ${geistMono.variable} h-full bg-paper antialiased`}
+      className={`${inter.variable} ${fredoka.variable} ${caveatBrush.variable} ${geistMono.variable} h-full bg-paper-grain antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-paper text-ink">
+      <body className="min-h-full flex flex-col bg-paper-grain text-ink">
         {children}
         <Toaster
           position="bottom-center"
