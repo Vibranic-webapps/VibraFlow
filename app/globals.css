@@ -256,7 +256,18 @@ body {
   to   { opacity: 1; }
 }
 
+/* Pull to refresh: while refreshing, a wave of dimmer chips runs left to right. */
+@keyframes ptr-wave {
+  0%, 60%, 100% { opacity: 1; }
+  30%           { opacity: 0.25; }
+}
+.ptr-sweep .ptr-seg {
+  animation: ptr-wave 900ms var(--ease-out) infinite;
+  animation-delay: calc(var(--i) * 45ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .ptr-sweep .ptr-seg { animation: none; }
   .press { transition: none; }
   .press:active:not(:disabled):not([aria-disabled="true"]) { transform: none; }
   [class*="animate-sheet-in"], [class*="animate-scrim-in"], .animate-pulse { animation: none; }
