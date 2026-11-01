@@ -7,6 +7,7 @@ import ListView from "@/app/components/tasks/ListView";
 import CalendarView from "@/app/components/CalendarView";
 import TodoView from "@/app/components/TodoView";
 import AccountMenu from "@/app/components/auth/AccountMenu";
+import { PullToRefresh } from "@/app/components/ui/PullToRefresh";
 import { TabBar, type TabItem } from "@/app/components/ui/TabBar";
 import { BoardIcon, CalendarIcon, CheckIcon } from "@/app/components/ui/icons";
 
@@ -27,10 +28,16 @@ const VIEW_TITLES: Record<View, string> = {
 };
 
 export default function Page() {
-    const { tasks, setTasks, loading: tasksLoading } = useTasks();
-    const { categories, setCategories } = useCategories();
-    const { states, setStates, loading: statesLoading } = useTodoStates();
+    const { tasks, setTasks, loading: tasksLoading, refresh: refreshTasks } = useTasks();
+    const { categories, setCategories, refresh: refreshCategories } = useCategories();
+    const { states, setStates, loading: statesLoading, refresh: refreshStates } = useTodoStates();
     const [view, setView] = useState<View>("tasks");
+
+    // Pull-to-refresh: refetch the data only (never reloads the app). Any failed list = "couldn't refresh".
+    const refreshAll = async () => {
+        const results = await Promise.all([refreshTasks(), refreshCategories(), refreshStates()]);
+        if (results.some((ok) => !ok)) throw new Error("refresh failed");
+    };
 
     // Swipe sideways to move between tabs. We ignore swipes that begin inside a
     // horizontally-scrollable region (calendar time grid, todos board) so those
@@ -66,7 +73,7 @@ export default function Page() {
                 <AccountMenu />
             </header>
             {/* The ONE scroll area. A view that wants the full height (calendar) fills it with flex-1 + min-h-0. */}
-            <main className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-none">
+            <PullToRefresh onRefresh={refreshAll}>
                 {view === "tasks" && <ListView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} loading={tasksLoading} />}
                 {view === "calendar" && <CalendarView tasks={tasks} setTasks={setTasks} categories={categories} setCategories={setCategories} />}
                 {view === "todos" && (
@@ -74,7 +81,7 @@ export default function Page() {
                         <TodoView tasks={tasks} setTasks={setTasks} states={states} setStates={setStates} loading={statesLoading} />
                     </div>
                 )}
-            </main>
+            </PullToRefresh>
             <TabBar
                 active={view}
                 items={PHASE1_TABS}

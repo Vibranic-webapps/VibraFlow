@@ -307,7 +307,7 @@ export default function TimeGridView({ days, tasks, onEditTask, onUpdateTask, on
     return (
         // The parent gives this a bounded height; this is the ONE vertical scroller of the view.
         <div className="line flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-surface">
-            <div ref={scrollerRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none">
+            <div ref={scrollerRef} data-no-pull className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none">
                 <div ref={headerRef} className="sticky top-0 z-30 bg-surface">
                     <div className="line-b flex">
                         <div className="w-12 shrink-0" />
